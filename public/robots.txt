@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /login
+
+# Authenticated application — not indexable
+Disallow: /app
+Disallow: /app/
+
+Sitemap: https://tigim.app/sitemap.xml
