@@ -47,6 +47,9 @@ coverage
 # Claude Code (local session/agent config)
 .claude
 
+# Temp commit message files
+.commit-msg.tmp
+
 # Misc
 .cache
 .parcel-cache
