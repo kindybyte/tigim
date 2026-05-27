@@ -3,6 +3,7 @@ import { Bell, ChevronDown, HelpCircle, LogOut, Menu, Search } from "lucide-reac
 import Avatar from "../ui/Avatar";
 import { company } from "../../data/mockData";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../lib/auth";
 
 interface TopbarProps {
   onOpenSidebar: () => void;
@@ -12,6 +13,19 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, signOut, configured } = useAuth();
+
+  // Display name: real user metadata if logged in, otherwise mock company owner.
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    company.owner;
+  const displayEmail = user?.email || company.name;
+
+  async function handleSignOut() {
+    if (configured) await signOut();
+    navigate("/");
+  }
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-panel-border bg-surface/85 px-4 backdrop-blur sm:px-6">
@@ -105,20 +119,22 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
             onClick={() => setProfileOpen((v) => !v)}
             className="flex items-center gap-2.5 rounded-lg p-1 pr-2 transition hover:bg-panel-muted"
           >
-            <Avatar name={company.owner} color="#2563EB" size="sm" />
+            <Avatar name={displayName} color="#2563EB" size="sm" />
             <div className="hidden text-left sm:block">
               <p className="text-sm font-semibold leading-tight text-ink-900">
-                {company.owner}
+                {displayName}
               </p>
-              <p className="text-[11px] leading-tight text-ink-600">Владелец</p>
+              <p className="text-[11px] leading-tight text-ink-600">
+                {user ? "Аккаунт" : "Демо-режим"}
+              </p>
             </div>
             <ChevronDown className="hidden h-4 w-4 text-ink-600 sm:block" />
           </button>
           {profileOpen && (
             <div className="absolute right-0 top-12 w-60 origin-top-right animate-fade-in rounded-2xl border border-panel-border bg-panel p-2 shadow-soft">
               <div className="px-3 py-2">
-                <p className="text-sm font-semibold text-ink-900">{company.owner}</p>
-                <p className="text-xs text-ink-600">{company.name}</p>
+                <p className="truncate text-sm font-semibold text-ink-900">{displayName}</p>
+                <p className="truncate text-xs text-ink-600">{displayEmail}</p>
               </div>
               <div className="divider my-1" />
               <button
@@ -128,7 +144,7 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
                 Настройки
               </button>
               <button
-                onClick={() => navigate("/")}
+                onClick={handleSignOut}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-300 hover:bg-rose-500/15"
               >
                 <LogOut className="h-4 w-4" /> Выйти
