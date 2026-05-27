@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ChevronRight,
+  ClipboardList,
   Download,
   Filter,
+  Loader2,
   Plus,
   Search,
   Sliders,
@@ -12,16 +14,20 @@ import {
 import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import ProgressBar from "../components/ui/ProgressBar";
+import EmptyState from "../components/ui/EmptyState";
 import { OrderStatusBadge } from "../components/ui/Badge";
 import Avatar from "../components/ui/Avatar";
+import OrderFormModal from "../components/OrderFormModal";
 import {
   daysUntil,
   formatDateShort,
   formatNumber,
   formatSom,
-  orders,
+  orders as mockOrders,
 } from "../data/mockData";
-import type { OrderStatus } from "../types";
+import type { Order, OrderStatus } from "../types";
+import { useAuth } from "../lib/auth";
+import { listOrders } from "../lib/orders";
 
 const STATUSES: OrderStatus[] = [
   "Новый",
@@ -35,13 +41,39 @@ const STATUSES: OrderStatus[] = [
 ];
 
 export default function Orders() {
+  const { configured, companyId } = useAuth();
+  const useRealData = configured && !!companyId;
+
+  const [orders, setOrders] = useState<Order[]>(useRealData ? [] : mockOrders);
+  const [loading, setLoading] = useState(useRealData);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "Все">("Все");
   const [responsibleFilter, setResponsibleFilter] = useState<string>("Все");
 
+  const refetch = useCallback(async () => {
+    if (!useRealData) return;
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const rows = await listOrders(companyId!);
+      setOrders(rows);
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Не удалось загрузить заказы");
+    } finally {
+      setLoading(false);
+    }
+  }, [useRealData, companyId]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   const responsibles = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.responsible))),
-    [],
+    () => Array.from(new Set(orders.map((o) => o.responsible).filter((r) => r && r !== "—"))),
+    [orders],
   );
 
   const filtered = useMemo(() => {
@@ -57,7 +89,7 @@ export default function Orders() {
       const matchesR = responsibleFilter === "Все" || o.responsible === responsibleFilter;
       return matchesQ && matchesS && matchesR;
     });
-  }, [query, statusFilter, responsibleFilter]);
+  }, [orders, query, statusFilter, responsibleFilter]);
 
   return (
     <div className="animate-fade-in">
@@ -66,10 +98,16 @@ export default function Orders() {
         description={`Всего ${orders.length} заказов · ${filtered.length} показано`}
         actions={
           <>
-            <button className="btn-secondary">
+            <button className="btn-secondary" disabled>
               <Download className="h-4 w-4" /> Экспорт в Excel
             </button>
-            <button className="btn-brand">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              disabled={!useRealData}
+              title={useRealData ? undefined : "В демо-режиме создание недоступно"}
+              className="btn-brand"
+            >
               <Plus className="h-4 w-4" /> Добавить заказ
             </button>
           </>
@@ -120,7 +158,34 @@ export default function Orders() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table / states */}
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-ink-600">
+            <Loader2 className="h-4 w-4 animate-spin" /> Загружаем заказы…
+          </div>
+        ) : fetchError ? (
+          <div className="mx-5 my-6 rounded-xl bg-rose-500/15 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/30">
+            Не удалось загрузить заказы: {fetchError}.{" "}
+            <button onClick={refetch} className="font-semibold underline">Повторить</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={ClipboardList}
+            title={orders.length === 0 ? "Пока нет заказов" : "Ничего не найдено"}
+            description={
+              orders.length === 0
+                ? "Добавьте первый заказ — он сразу появится здесь."
+                : "Попробуйте изменить фильтры или поисковый запрос."
+            }
+            action={
+              orders.length === 0 && useRealData ? (
+                <button onClick={() => setCreateOpen(true)} className="btn-brand">
+                  <Plus className="h-4 w-4" /> Добавить заказ
+                </button>
+              ) : undefined
+            }
+          />
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -210,18 +275,27 @@ export default function Orders() {
             </tbody>
           </table>
         </div>
+        )}
 
-        {/* Footer / pagination */}
-        <div className="flex items-center justify-between border-t border-panel-border px-5 py-3 text-xs text-ink-600">
-          <p>Показано {filtered.length} из {orders.length}</p>
-          <div className="flex items-center gap-1">
-            <button className="rounded-md px-2.5 py-1.5 hover:bg-panel-muted">Назад</button>
-            <button className="rounded-md bg-brand-600 px-2.5 py-1.5 font-semibold text-white">1</button>
-            <button className="rounded-md px-2.5 py-1.5 hover:bg-panel-muted">2</button>
-            <button className="rounded-md px-2.5 py-1.5 hover:bg-panel-muted">Вперёд</button>
+        {/* Footer */}
+        {!loading && filtered.length > 0 && (
+          <div className="flex items-center justify-between border-t border-panel-border px-5 py-3 text-xs text-ink-600">
+            <p>Показано {filtered.length} из {orders.length}</p>
           </div>
-        </div>
+        )}
       </Card>
+
+      {useRealData && companyId && (
+        <OrderFormModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false);
+            refetch();
+          }}
+          companyId={companyId}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -5,6 +6,7 @@ import {
   Circle,
   Download,
   ImageIcon,
+  Loader2,
   MessageCircle,
   Phone,
   Printer,
@@ -19,18 +21,76 @@ import ProgressBar from "../components/ui/ProgressBar";
 import Avatar from "../components/ui/Avatar";
 import {
   daysUntil,
-  defects,
+  defects as mockDefects,
   formatDateShort,
   formatNumber,
   formatSom,
-  orders,
+  orders as mockOrders,
 } from "../data/mockData";
+import type { Order } from "../types";
+import { useAuth } from "../lib/auth";
+import { getOrderByNumber } from "../lib/orders";
 
 export default function OrderDetails() {
   const { id } = useParams<{ id: string }>();
-  const order = orders.find((o) => o.id === id) ?? orders[0];
+  const { configured, companyId } = useAuth();
+  const useRealData = configured && !!companyId;
+
+  const [order, setOrder] = useState<Order | null>(
+    useRealData ? null : mockOrders.find((o) => o.id === id) ?? mockOrders[0],
+  );
+  const [loading, setLoading] = useState(useRealData);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!useRealData || !id) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getOrderByNumber(companyId!, id)
+      .then((row) => {
+        if (cancelled) return;
+        setOrder(row);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Не удалось загрузить заказ");
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useRealData, companyId, id]);
+
+  if (loading) {
+    return (
+      <div className="grid place-items-center py-20 text-sm text-ink-600">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Загружаем заказ…
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="animate-fade-in">
+        <Link to="/app/orders" className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-800">
+          <ArrowLeft className="h-4 w-4" /> Все заказы
+        </Link>
+        <div className="rounded-2xl border border-panel-border bg-panel p-10 text-center">
+          <h2 className="text-lg font-semibold text-ink-900">
+            {error ? "Не удалось загрузить заказ" : `Заказ #${id} не найден`}
+          </h2>
+          {error && <p className="mt-2 text-sm text-ink-600">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
   const dleft = daysUntil(order.deadline);
-  const orderDefects = defects.filter((d) => d.orderId === order.id);
+  const orderDefects = useRealData ? [] : mockDefects.filter((d) => d.orderId === order.id);
 
   const costSum =
     order.costBreakdown.fabric +
