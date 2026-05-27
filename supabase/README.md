@@ -35,7 +35,7 @@ supabase db push
 | Файл | Что делает |
 |---|---|
 | `0001_init_schema.sql` | Создаёт все таблицы, helpers, триггеры. Включает RLS в режиме «default deny» (anon-ключ ничего не может — это безопасно по умолчанию). |
-| `0002_rls_policies.sql` | (будет в Шаге 10) Открывает доступ к данным согласно ролям внутри company. |
+| `0002_rls_policies.sql` | Политики RLS: tenant-изоляция по company_id + write-доступ по ролям (owner/manager/master/warehouse/qc/staff). Лиды доступны на INSERT всем, читать может только service_role. |
 
 ## Откат миграции
 
