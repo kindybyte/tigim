@@ -280,3 +280,28 @@ export async function deleteOrder(orderNumber: string, companyId: string): Promi
     .eq("number", orderNumber);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Subscribe to realtime INSERT/UPDATE/DELETE on the orders table for a given
+ * company. Returns an unsubscribe function. Calls `onChange` on every event
+ * — caller should debounce/refetch as needed.
+ */
+export function subscribeToOrders(companyId: string, onChange: () => void): () => void {
+  const supabase = getSupabase();
+  const channel = supabase
+    .channel(`orders:${companyId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "orders",
+        filter: `company_id=eq.${companyId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}
