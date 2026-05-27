@@ -227,9 +227,9 @@ export default function AIAssistant() {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <div className="flex items-center gap-1 rounded-2xl rounded-tl-sm bg-panel-muted px-4 py-3 text-sm text-ink-600">
-                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-slate-400" />
-                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-slate-400" style={{ animationDelay: "120ms" }} />
-                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-slate-400" style={{ animationDelay: "240ms" }} />
+                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-ink-600" />
+                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-ink-600" style={{ animationDelay: "120ms" }} />
+                  <span className="h-2 w-2 animate-pulse-soft rounded-full bg-ink-600" style={{ animationDelay: "240ms" }} />
                 </div>
               </div>
             )}
@@ -246,7 +246,7 @@ export default function AIAssistant() {
                 <button
                   key={q}
                   onClick={() => send(q)}
-                  className="rounded-full border border-panel-border bg-panel px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:border-brand-500/30 hover:bg-brand-500/15 hover:text-brand-300"
+                  className="rounded-full border border-panel-border bg-panel px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:border-brand-500/30 hover:bg-brand-500/15 hover:text-brand-200"
                 >
                   {q}
                 </button>

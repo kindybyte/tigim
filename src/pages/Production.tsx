@@ -18,7 +18,7 @@ type KanbanColumn = {
 };
 
 const COLUMNS: KanbanColumn[] = [
-  { key: "Новый", title: "Новый заказ", accent: "bg-slate-400", ring: "ring-panel-border" },
+  { key: "Новый", title: "Новый заказ", accent: "bg-ink-600", ring: "ring-panel-border" },
   { key: "Раскрой", title: "Раскрой", accent: "bg-sky-500", ring: "ring-sky-500/30" },
   { key: "Пошив", title: "Пошив", accent: "bg-brand-600", ring: "ring-brand-500/30" },
   { key: "ОТК", title: "ОТК", accent: "bg-violet-500", ring: "ring-violet-500/30" },
@@ -73,7 +73,7 @@ export default function Production() {
                     items.map((o) => <KanbanCard key={o.id} order={o} />)
                   )}
 
-                  <button className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-panel-border py-2 text-xs font-medium text-ink-600 hover:border-brand-500/30 hover:text-brand-300">
+                  <button className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-panel-border py-2 text-xs font-medium text-ink-600 hover:border-brand-500/30 hover:text-brand-200">
                     <Plus className="h-3.5 w-3.5" /> Добавить заказ
                   </button>
                 </div>

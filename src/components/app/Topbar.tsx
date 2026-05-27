@@ -54,7 +54,7 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
             aria-label="Уведомления"
           >
             <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-surface" />
           </button>
           {notifOpen && (
             <div className="absolute right-0 top-12 w-80 origin-top-right animate-fade-in rounded-2xl border border-panel-border bg-panel p-2 shadow-soft">

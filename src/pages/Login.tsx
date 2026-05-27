@@ -49,7 +49,7 @@ export default function Login() {
             <div>
               <div className="flex items-center justify-between">
                 <label htmlFor="login-pw" className="label">Пароль</label>
-                <a href="#" className="text-xs font-medium text-brand-300 hover:text-brand-300">
+                <a href="#" className="text-xs font-medium text-brand-300 hover:text-brand-200">
                   Забыли пароль?
                 </a>
               </div>

@@ -161,7 +161,7 @@ export default function Settings() {
                     <p className="text-sm text-ink-800">{n.l}</p>
                     <span
                       className={`relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full transition ${
-                        n.on ? "bg-brand-600" : "bg-slate-200"
+                        n.on ? "bg-brand-600" : "bg-panel-border"
                       }`}
                     >
                       <span className={`inline-block h-5 w-5 transform rounded-full bg-panel shadow transition ${n.on ? "translate-x-5" : "translate-x-0.5"}`} />

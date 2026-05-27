@@ -502,7 +502,7 @@ function HeroVisual() {
                   i === 0 ? "bg-brand-500/15 font-semibold text-brand-300" : "text-ink-600"
                 }`}
               >
-                <span className={`h-2 w-2 rounded ${i === 0 ? "bg-brand-500" : "bg-slate-300"}`} />
+                <span className={`h-2 w-2 rounded ${i === 0 ? "bg-brand-500" : "bg-ink-700"}`} />
                 {l}
               </div>
             ))}

@@ -145,7 +145,7 @@ export default function Orders() {
                 return (
                   <tr key={o.id} className="border-b border-panel-border last:border-0 hover:bg-panel-muted/50">
                     <td className="px-5 py-3 align-middle">
-                      <Link to={`/app/orders/${o.id}`} className="font-bold text-ink-900 hover:text-brand-300">
+                      <Link to={`/app/orders/${o.id}`} className="font-bold text-ink-900 hover:text-brand-200">
                         #{o.id}
                       </Link>
                     </td>

@@ -51,7 +51,7 @@ export default function Dashboard() {
     .slice(0, 4);
 
   const stageCounts = [
-    { name: "Новый", count: orders.filter((o) => o.status === "Новый").length, tone: "bg-slate-400" },
+    { name: "Новый", count: orders.filter((o) => o.status === "Новый").length, tone: "bg-ink-600" },
     { name: "Раскрой", count: orders.filter((o) => o.status === "Раскрой").length, tone: "bg-sky-500" },
     { name: "Пошив", count: orders.filter((o) => o.status === "Пошив").length, tone: "bg-brand-600" },
     { name: "ОТК", count: orders.filter((o) => o.status === "ОТК").length, tone: "bg-violet-500" },
