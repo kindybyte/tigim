@@ -37,19 +37,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setCompanyLoading(true);
-    const { data, error } = await getSupabase()
-      .from("company_members")
-      .select("company_id")
-      .eq("user_id", uid)
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      console.warn("[auth] fetch company failed:", error.message);
+    try {
+      const queryPromise: Promise<{
+        data: { company_id: string } | null;
+        error: { message: string } | null;
+      }> = Promise.resolve(
+        getSupabase()
+          .from("company_members")
+          .select("company_id")
+          .eq("user_id", uid)
+          .limit(1)
+          .maybeSingle(),
+      );
+      const result = await withTimeout(queryPromise, 10000);
+      if (result.error) {
+        console.warn("[auth] fetch company failed:", result.error.message);
+        setCompanyId(null);
+      } else {
+        setCompanyId(result.data?.company_id ?? null);
+      }
+    } catch (e) {
+      console.warn("[auth] fetch company timed out / failed:", e);
       setCompanyId(null);
-    } else {
-      setCompanyId(data?.company_id ?? null);
+    } finally {
+      setCompanyLoading(false);
     }
-    setCompanyLoading(false);
   }, []);
 
   useEffect(() => {
@@ -59,29 +71,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const supabase = getSupabase();
+    let mounted = true;
+    let lastUserId: string | null = null;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-      if (data.session?.user) {
-        await fetchCompany(data.session.user.id);
+    // Single place to react to session changes. Skipped if user id didn't change
+    // (so TOKEN_REFRESHED doesn't re-fetch the company).
+    const applySession = (newSession: Session | null) => {
+      if (!mounted) return;
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      const uid = newSession?.user?.id ?? null;
+      if (uid === lastUserId) return;
+      lastUserId = uid;
+      if (uid) {
+        // Optimistically show spinner; defer fetch out of the auth-lock.
+        setCompanyLoading(true);
+        setTimeout(() => {
+          if (mounted) void fetchCompany(uid);
+        }, 0);
+      } else {
+        setCompanyId(null);
+        setCompanyLoading(false);
       }
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      applySession(data.session);
+      setLoading(false);
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        await fetchCompany(newSession.user.id);
-      } else {
-        setCompanyId(null);
-      }
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // CRITICAL: do NOT make supabase.from() calls directly here — that
+      // causes a deadlock with the auth-state lock. applySession defers
+      // any DB call to setTimeout(0).
+      applySession(newSession);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchCompany]);
 
   const refreshCompany = useCallback(async () => {
