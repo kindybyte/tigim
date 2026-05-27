@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import Logo from "../components/ui/Logo";
+import DemoModeBanner from "../components/DemoModeBanner";
 import { useAuth } from "../lib/auth";
 
 export default function Signup() {
@@ -47,7 +48,8 @@ export default function Signup() {
           <Logo />
         </Link>
 
-        <div className="mt-8 rounded-2xl border border-panel-border bg-panel p-7 shadow-soft">
+        <DemoModeBanner />
+        <div className="rounded-2xl border border-panel-border bg-panel p-7 shadow-soft">
           {needsConfirmation ? (
             <div className="text-center">
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30">

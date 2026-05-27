@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
 import Logo from "../components/ui/Logo";
+import DemoModeBanner from "../components/DemoModeBanner";
 import { useAuth } from "../lib/auth";
 
 export default function Login() {
@@ -44,6 +45,7 @@ export default function Login() {
         </Link>
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10">
+          <DemoModeBanner />
           <h1 className="text-3xl font-bold tracking-tight text-ink-900">Войти в Tigim</h1>
           <p className="mt-2 text-sm text-ink-600">Система контроля швейного производства</p>
 
