@@ -247,7 +247,7 @@ export default function AIAssistant() {
 
           {/* Input */}
           <form onSubmit={onSubmit} className="border-t border-panel-border p-3 sm:p-4">
-            <div className="flex items-end gap-2 rounded-2xl border border-panel-border bg-panel p-2 shadow-sm focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
+            <div className="flex items-end gap-2 rounded-2xl border border-panel-border bg-panel p-2 shadow-sm transition-colors focus-within:border-brand-500">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
