@@ -20,14 +20,15 @@ export default function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
 
     if (!configured) {
-      // Mock mode: just navigate
-      setTimeout(() => navigate(from, { replace: true }), 400);
+      setError(
+        "Авторизация не настроена. Используйте кнопку «Зайти как демо-пользователь» ниже, чтобы посмотреть mock-данные.",
+      );
       return;
     }
 
+    setLoading(true);
     const result = await signIn(email, password);
     setLoading(false);
     if (result.error) {

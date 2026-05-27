@@ -20,13 +20,15 @@ export default function Signup() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
 
     if (!configured) {
-      setTimeout(() => navigate("/app", { replace: true }), 400);
+      setError(
+        "Регистрация не настроена. Проверьте VITE_SUPABASE_URL и VITE_SUPABASE_ANON_KEY в Vercel и сделайте Redeploy.",
+      );
       return;
     }
 
+    setLoading(true);
     const result = await signUp(email, password, fullName || undefined);
     setLoading(false);
 
