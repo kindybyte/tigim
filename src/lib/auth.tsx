@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "./supabase";
 
@@ -7,6 +7,9 @@ interface AuthContextValue {
   session: Session | null;
   loading: boolean;
   configured: boolean;
+  companyId: string | null;
+  companyLoading: boolean;
+  refreshCompany: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (
     email: string,
@@ -24,6 +27,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyLoading, setCompanyLoading] = useState(false);
+
+  const fetchCompany = useCallback(async (uid: string | undefined) => {
+    if (!uid || !supabaseConfigured) {
+      setCompanyId(null);
+      setCompanyLoading(false);
+      return;
+    }
+    setCompanyLoading(true);
+    const { data, error } = await getSupabase()
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", uid)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.warn("[auth] fetch company failed:", error.message);
+      setCompanyId(null);
+    } else {
+      setCompanyId(data?.company_id ?? null);
+    }
+    setCompanyLoading(false);
+  }, []);
 
   useEffect(() => {
     if (!supabaseConfigured) {
@@ -33,21 +60,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = getSupabase();
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       setUser(data.session?.user ?? null);
       setLoading(false);
+      if (data.session?.user) {
+        await fetchCompany(data.session.user.id);
+      }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
+      if (newSession?.user) {
+        await fetchCompany(newSession.user.id);
+      } else {
+        setCompanyId(null);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchCompany]);
+
+  const refreshCompany = useCallback(async () => {
+    await fetchCompany(user?.id);
+  }, [fetchCompany, user?.id]);
 
   const signIn: AuthContextValue["signIn"] = async (email, password) => {
     if (!supabaseConfigured) return { error: "Авторизация не настроена" };
@@ -72,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (!supabaseConfigured) return;
     await getSupabase().auth.signOut();
+    setCompanyId(null);
   };
 
   const resetPassword: AuthContextValue["resetPassword"] = async (email) => {
@@ -95,6 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         configured: supabaseConfigured,
+        companyId,
+        companyLoading,
+        refreshCompany,
         signIn,
         signUp,
         signOut,
