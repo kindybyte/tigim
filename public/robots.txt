@@ -6,4 +6,4 @@ Allow: /login
 Disallow: /app
 Disallow: /app/
 
-Sitemap: https://tigim.app/sitemap.xml
+Sitemap: https://tigim.vercel.app/sitemap.xml
