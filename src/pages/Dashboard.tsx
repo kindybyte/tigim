@@ -35,8 +35,32 @@ import {
   orders,
   revenueByMonth,
 } from "../data/mockData";
+import { useAuth } from "../lib/auth";
+
+function greetingForHour(h: number): string {
+  if (h < 5) return "Доброй ночи";
+  if (h < 12) return "Доброе утро";
+  if (h < 18) return "Добрый день";
+  return "Добрый вечер";
+}
+
+function todayRu(): string {
+  return new Date().toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const firstName =
+    (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "";
+  const greeting = greetingForHour(new Date().getHours());
+  const greetingText = firstName ? `${greeting}, ${firstName} 👋` : `${greeting} 👋`;
+
   const activeOrders = orders.filter((o) => !["Готово", "Отгружено"].includes(o.status));
   const inWork = orders.filter((o) => ["Раскрой", "Пошив", "ОТК", "Упаковка"].includes(o.status));
   const overdue = orders.filter((o) => daysUntil(o.deadline) < 0 && !["Готово", "Отгружено"].includes(o.status));
@@ -73,8 +97,8 @@ export default function Dashboard() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Добрый день, Айбек 👋"
-        description={`Сегодня 25 мая 2026 · в работе ${inWork.length} заказов, ${overdue.length} требуют внимания`}
+        title={greetingText}
+        description={`Сегодня ${todayRu()} · в работе ${inWork.length} заказов, ${overdue.length} требуют внимания`}
         actions={
           <>
             <Link to="/app/ai" className="btn-secondary">
