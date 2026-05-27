@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-surface text-ink antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.35);
+  color: #F1F5F9;
+}
+
+/* Focus styles — brand glow */
+*:focus-visible {
+  @apply outline-none ring-2 ring-brand-500/50 ring-offset-2 ring-offset-surface rounded-md;
+}
+
+/* Scrollbar — subtle on dark */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2D44;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2A3A55;
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-400 shadow-soft;
+  }
+  .btn-brand {
+    @apply btn bg-brand-600 text-white hover:bg-brand-500 shadow-soft;
+  }
+  .btn-secondary {
+    @apply btn bg-panel-muted text-ink-900 border border-panel-border hover:bg-panel-hover;
+  }
+  .btn-ghost {
+    @apply btn text-ink-700 hover:bg-panel-muted;
+  }
+  .input {
+    @apply w-full rounded-lg border border-panel-border bg-panel-muted px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-600 transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30;
+  }
+  .label {
+    @apply text-sm font-medium text-ink-800;
+  }
+  .card {
+    @apply rounded-2xl bg-panel border border-panel-border shadow-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  .section-title {
+    @apply text-sm font-semibold text-ink-900;
+  }
+  .muted {
+    @apply text-ink-600;
+  }
+  .divider {
+    @apply h-px w-full bg-panel-border;
+  }
+  .kbd {
+    @apply inline-flex items-center justify-center rounded-md border border-panel-border bg-panel-muted px-1.5 py-0.5 text-[11px] font-medium text-ink-600;
+  }
+}
