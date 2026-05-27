@@ -140,21 +140,6 @@ export default function Landing() {
             {/* Hero visual: dashboard mock */}
             <HeroVisual />
           </div>
-
-          {/* Logos / stats */}
-          <div className="mt-16 grid grid-cols-2 gap-4 rounded-2xl border border-panel-border bg-panel p-6 shadow-card sm:grid-cols-4">
-            {[
-              { v: "120+", l: "Цехов используют" },
-              { v: "85 000+", l: "Заказов в системе" },
-              { v: "−38%", l: "Сокращение брака" },
-              { v: "×2", l: "Скорость учёта" },
-            ].map((s) => (
-              <div key={s.l} className="text-center">
-                <p className="text-2xl font-bold tracking-tight text-ink-900">{s.v}</p>
-                <p className="mt-1 text-xs text-ink-600">{s.l}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 

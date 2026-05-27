@@ -187,19 +187,12 @@ export default function Login() {
             </ul>
           </div>
 
-          <figure className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm leading-relaxed text-brand-50/95">
-              «Раньше я не знал, где теряются деньги. С Tigim вижу каждый этап производства и брак —
-              сразу. За месяц мы снизили брак почти на половину».
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <p className="text-sm font-semibold text-white">14 дней бесплатно</p>
+            <p className="mt-1 text-sm leading-relaxed text-brand-50/95">
+              Полный доступ ко всем функциям. Без банковской карты — отмена в любой момент.
             </p>
-            <figcaption className="mt-4 flex items-center gap-3 text-sm">
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-white/15 font-bold">АТ</span>
-              <div>
-                <p className="font-semibold">Айбек Турдубеков</p>
-                <p className="text-xs text-brand-100/80">Владелец цеха, Бишкек</p>
-              </div>
-            </figcaption>
-          </figure>
+          </div>
         </div>
       </div>
     </div>

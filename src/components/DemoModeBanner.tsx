@@ -1,25 +1,14 @@
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useAuth } from "../lib/auth";
 
 /**
- * Shown on auth pages when Supabase is not configured (no VITE_SUPABASE_*
- * env vars). Makes the "mock mode" state visible so users / devs don't
- * silently fall into demo navigation.
- *
- * When `configured = true`, renders a small green confirmation chip so we
- * can visually verify env vars actually loaded on this build.
+ * Shows a yellow warning ONLY when Supabase isn't configured (mock mode).
+ * In production / when configured = true, this renders nothing — clean UX.
  */
 export default function DemoModeBanner() {
   const { configured } = useAuth();
 
-  if (configured) {
-    return (
-      <div className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300 ring-1 ring-emerald-500/30">
-        <CheckCircle2 className="h-3 w-3" />
-        Supabase подключён
-      </div>
-    );
-  }
+  if (configured) return null;
 
   return (
     <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
