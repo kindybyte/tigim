@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { getSupabase } from "./supabase";
+import { getFinanceData } from "./finance";
 
 // ---------- Excel ----------
 
@@ -121,7 +122,6 @@ export async function exportWarehouseXlsx(companyId: string): Promise<void> {
 }
 
 export async function exportFinanceXlsx(companyId: string): Promise<void> {
-  const { getFinanceData } = await import("./finance");
   const data = await getFinanceData(companyId);
 
   const ordersRows = data.orderFinancials.map((o) => ({
