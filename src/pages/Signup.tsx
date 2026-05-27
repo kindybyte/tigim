@@ -150,6 +150,13 @@ export default function Signup() {
                   )}
                 </button>
 
+                <p className="text-center text-[11px] leading-relaxed text-ink-600">
+                  Создавая аккаунт, вы соглашаетесь с{" "}
+                  <Link to="/terms" className="font-semibold text-brand-300 hover:underline">условиями использования</Link>
+                  {" "}и{" "}
+                  <Link to="/privacy" className="font-semibold text-brand-300 hover:underline">политикой конфиденциальности</Link>.
+                </p>
+
                 <div className="space-y-1.5 pt-2 text-xs text-ink-600">
                   <p className="flex items-start gap-2">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />

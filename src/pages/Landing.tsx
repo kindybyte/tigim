@@ -463,8 +463,9 @@ export default function Landing() {
             <a href="#pricing" className="text-ink-700 hover:text-ink-900">Тарифы</a>
             <a href="#how" className="text-ink-700 hover:text-ink-900">Как работает</a>
             <Link to="/login" className="text-ink-700 hover:text-ink-900">Войти</Link>
-            <a href="#" className="text-ink-700 hover:text-ink-900">Контакты</a>
-            <a href="#" className="text-ink-700 hover:text-ink-900">Поддержка</a>
+            <Link to="/terms" className="text-ink-700 hover:text-ink-900">Условия использования</Link>
+            <Link to="/privacy" className="text-ink-700 hover:text-ink-900">Конфиденциальность</Link>
+            <Link to="/offer" className="text-ink-700 hover:text-ink-900">Публичная оферта</Link>
           </div>
           <p className="text-xs text-ink-600">© {new Date().getFullYear()} Tigim. Все права защищены.</p>
         </div>
