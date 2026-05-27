@@ -80,6 +80,8 @@ export default function AIAssistant() {
     setInput("");
     setThinking(true);
 
+    const ctrl = new AbortController();
+    const timeoutId = window.setTimeout(() => ctrl.abort(), 35000);
     try {
       const payload = updated
         .filter((m) => m.id !== "m-welcome")
@@ -93,6 +95,7 @@ export default function AIAssistant() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ messages: payload }),
+        signal: ctrl.signal,
       });
 
       const data = (await res.json().catch(() => ({}))) as {
@@ -117,9 +120,15 @@ export default function AIAssistant() {
           time: nowTime(),
         },
       ]);
-    } catch {
-      setError("Не удалось связаться с сервером. Проверьте интернет и попробуйте ещё раз.");
+    } catch (e) {
+      const isAbort = e instanceof DOMException && e.name === "AbortError";
+      setError(
+        isAbort
+          ? "Сервер не ответил за 35 секунд. Если проблема повторится — проверь Vercel Function Logs."
+          : "Не удалось связаться с сервером. Проверьте интернет и попробуйте ещё раз.",
+      );
     } finally {
+      window.clearTimeout(timeoutId);
       setThinking(false);
     }
   }

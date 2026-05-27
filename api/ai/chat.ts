@@ -32,6 +32,10 @@ const PLAN_LIMITS: Record<string, number> = {
 
 const DONE_STATUSES = new Set(["Готово", "Отгружено"]);
 
+// Cold start + Anthropic call can exceed Vercel's 10s default.
+// 30s gives buffer (Hobby plan max is 60s).
+export const config = { maxDuration: 30 };
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -128,6 +132,13 @@ export default async function handler(req: Request): Promise<Response> {
       .eq("user_id", userId)
       .eq("date", today)
       .maybeSingle();
+    if (usageRes.error) {
+      console.error("[ai] ai_usage read failed", usageRes.error);
+      const msg = /relation .* does not exist/i.test(usageRes.error.message)
+        ? "Таблица ai_usage не найдена. Примените миграцию supabase/migrations/0007_ai_usage.sql."
+        : `Не удалось прочитать счётчик использования: ${usageRes.error.message}`;
+      return json({ error: msg }, 500);
+    }
     const usageToday = usageRes.data ?? { messages: 0, tokens_in: 0, tokens_out: 0 };
     if (usageToday.messages >= limit) {
       return json(
