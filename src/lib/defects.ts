@@ -58,6 +58,7 @@ export interface NewDefectInput {
   reason: DefectReason;
   stage: StageName;
   loss: number;
+  employeeId?: string;
   photoFile?: File;
 }
 
@@ -92,6 +93,7 @@ export async function createDefect(companyId: string, input: NewDefectInput): Pr
       reason: input.reason,
       stage: input.stage,
       loss: input.loss,
+      employee_id: input.employeeId || null,
     })
     .select("id")
     .single();

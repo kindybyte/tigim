@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { createOrder } from "../lib/orders";
-import type { Priority } from "../types";
+import { listEmployees } from "../lib/employees";
+import type { Employee, Priority } from "../types";
 
 interface OrderFormModalProps {
   open: boolean;
@@ -25,8 +26,10 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
   const [unitCost, setUnitCost] = useState("");
   const [deadline, setDeadline] = useState("");
   const [priority, setPriority] = useState<Priority>("normal");
+  const [responsibleId, setResponsibleId] = useState("");
   const [comment, setComment] = useState("");
   const [sizes, setSizes] = useState<SizeRow[]>([{ size: "S", qty: "" }]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,11 +59,16 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
       setUnitCost("");
       setDeadline("");
       setPriority("normal");
+      setResponsibleId("");
       setComment("");
       setSizes([{ size: "S", qty: "" }]);
       setError(null);
+      // Fetch employees for the responsible dropdown
+      listEmployees(companyId)
+        .then(setEmployees)
+        .catch((err) => console.warn("[order] load employees failed:", err));
     }
-  }, [open]);
+  }, [open, companyId]);
 
   if (!open) return null;
 
@@ -109,6 +117,7 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
         unitCost: parseFloat(unitCost) || 0,
         deadline: deadline || undefined,
         priority,
+        responsibleId: responsibleId || undefined,
         comment: comment.trim() || undefined,
         sizes: cleanSizes,
       });
@@ -242,7 +251,7 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
               <label htmlFor="of-priority" className="label">Приоритет</label>
               <select
                 id="of-priority"
@@ -253,6 +262,21 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
                 <option value="low">Низкий</option>
                 <option value="normal">Обычный</option>
                 <option value="high">Высокий</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="of-resp" className="label">Ответственный</label>
+              <select
+                id="of-resp"
+                value={responsibleId}
+                onChange={(e) => setResponsibleId(e.target.value)}
+                className="input mt-1.5"
+              >
+                <option value="">— не выбран —</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name} · {e.role}</option>
+                ))}
               </select>
             </div>
 

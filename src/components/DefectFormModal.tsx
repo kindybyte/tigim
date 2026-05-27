@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { createDefect, listOrdersForDefect } from "../lib/defects";
-import type { DefectReason, StageName } from "../types";
+import { listEmployees } from "../lib/employees";
+import type { DefectReason, Employee, StageName } from "../types";
 
 interface DefectFormModalProps {
   open: boolean;
@@ -38,6 +39,7 @@ export default function DefectFormModal({
   companyId,
 }: DefectFormModalProps) {
   const [orders, setOrders] = useState<{ number: string; product: string; unitCost: number }[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [orderNumber, setOrderNumber] = useState<string>("");
   const [product, setProduct] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -46,6 +48,7 @@ export default function DefectFormModal({
   const [reason, setReason] = useState<DefectReason>("Неровный шов");
   const [stage, setStage] = useState<StageName>("Пошив");
   const [loss, setLoss] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,12 +79,16 @@ export default function DefectFormModal({
     setReason("Неровный шов");
     setStage("Пошив");
     setLoss("");
+    setEmployeeId("");
     setPhotoFile(null);
     setPhotoPreview(null);
     setError(null);
     listOrdersForDefect(companyId)
       .then(setOrders)
       .catch((err) => console.warn("[defect] load orders failed:", err));
+    listEmployees(companyId)
+      .then(setEmployees)
+      .catch((err) => console.warn("[defect] load employees failed:", err));
   }, [open, companyId]);
 
   // Auto-fill product + loss when order selected
@@ -136,6 +143,7 @@ export default function DefectFormModal({
         reason,
         stage,
         loss: parseFloat(loss) || 0,
+        employeeId: employeeId || undefined,
         photoFile: photoFile || undefined,
       });
       onCreated();
@@ -259,6 +267,23 @@ export default function DefectFormModal({
                 className="input mt-1.5"
               >
                 {STAGES.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label htmlFor="df-emp" className="label">
+                Сотрудник <span className="text-ink-600">(кто допустил брак)</span>
+              </label>
+              <select
+                id="df-emp"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                className="input mt-1.5"
+              >
+                <option value="">— не привязан —</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>{e.name} · {e.role}</option>
+                ))}
               </select>
             </div>
 
