@@ -90,22 +90,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthContextValue["signIn"] = async (email, password) => {
     if (!supabaseConfigured) return { error: "Авторизация не настроена" };
-    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
-    return error ? { error: translateAuthError(error.message) } : {};
+    try {
+      const { error } = await withTimeout(
+        getSupabase().auth.signInWithPassword({ email, password }),
+        15000,
+      );
+      return error ? { error: translateAuthError(error.message) } : {};
+    } catch (e) {
+      return { error: errorToMessage(e) };
+    }
   };
 
   const signUp: AuthContextValue["signUp"] = async (email, password, fullName) => {
     if (!supabaseConfigured) return { error: "Регистрация не настроена" };
-    const { data, error } = await getSupabase().auth.signUp({
-      email,
-      password,
-      options: {
-        data: fullName ? { full_name: fullName } : undefined,
-        emailRedirectTo: `${window.location.origin}/login`,
-      },
-    });
-    if (error) return { error: translateAuthError(error.message) };
-    return { needsEmailConfirmation: !data.session };
+    try {
+      const { data, error } = await withTimeout(
+        getSupabase().auth.signUp({
+          email,
+          password,
+          options: {
+            data: fullName ? { full_name: fullName } : undefined,
+            emailRedirectTo: `${window.location.origin}/login`,
+          },
+        }),
+        15000,
+      );
+      if (error) return { error: translateAuthError(error.message) };
+      return { needsEmailConfirmation: !data.session };
+    } catch (e) {
+      return { error: errorToMessage(e) };
+    }
   };
 
   const signOut = async () => {
@@ -165,6 +179,23 @@ function translateAuthError(msg: string): string {
     return "Пароль слишком короткий (минимум 6 символов)";
   if (m.includes("rate limit") || m.includes("too many"))
     return "Слишком много попыток. Подождите и попробуйте снова.";
-  if (m.includes("network")) return "Ошибка сети. Проверьте подключение.";
+  if (m.includes("network") || m.includes("failed to fetch"))
+    return "Не удалось подключиться к серверу. Проверьте интернет и URL Supabase.";
+  if (m.includes("timeout"))
+    return "Сервер не ответил за 15 секунд. Проверьте VITE_SUPABASE_URL и интернет.";
   return msg;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timeout")), ms),
+    ),
+  ]);
+}
+
+function errorToMessage(e: unknown): string {
+  if (e instanceof Error) return translateAuthError(e.message);
+  return "Неизвестная ошибка";
 }
