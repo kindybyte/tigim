@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -19,8 +20,24 @@ import {
   Workflow,
 } from "lucide-react";
 import Logo from "../components/ui/Logo";
+import DemoRequestModal from "../components/DemoRequestModal";
+import { track } from "../lib/analytics";
+
+interface DemoModalState {
+  open: boolean;
+  source: string;
+  tier?: string;
+}
 
 export default function Landing() {
+  const [demo, setDemo] = useState<DemoModalState>({ open: false, source: "" });
+
+  const openDemo = (source: string, tier?: string) => {
+    track("cta_clicked", { source, tier });
+    setDemo({ open: true, source, tier });
+  };
+  const closeDemo = () => setDemo((d) => ({ ...d, open: false }));
+
   return (
     <div className="min-h-screen bg-surface text-ink-900">
       {/* NAV */}
@@ -36,13 +53,21 @@ export default function Landing() {
             <a href="#pricing" className="hover:text-ink-900">Тарифы</a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link to="/login" className="btn-ghost hidden sm:inline-flex">
+            <Link
+              to="/login"
+              className="btn-ghost hidden sm:inline-flex"
+              onClick={() => track("cta_clicked", { source: "header_login" })}
+            >
               Войти
             </Link>
-            <Link to="/app" className="btn-brand">
+            <button
+              type="button"
+              onClick={() => openDemo("header_try")}
+              className="btn-brand"
+            >
               Попробовать
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </header>
@@ -78,11 +103,19 @@ export default function Landing() {
               </p>
 
               <div className="mt-7 flex flex-wrap items-center gap-3">
-                <Link to="/login" className="btn-brand px-5 py-3 text-base">
+                <button
+                  type="button"
+                  onClick={() => openDemo("hero_try_free")}
+                  className="btn-brand px-5 py-3 text-base"
+                >
                   Попробовать бесплатно
                   <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link to="/app" className="btn-secondary px-5 py-3 text-base">
+                </button>
+                <Link
+                  to="/app"
+                  onClick={() => track("cta_clicked", { source: "hero_view_demo" })}
+                  className="btn-secondary px-5 py-3 text-base"
+                >
                   <Play className="h-4 w-4" />
                   Посмотреть демо
                 </Link>
@@ -386,12 +419,13 @@ export default function Landing() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to="/login"
+                <button
+                  type="button"
+                  onClick={() => openDemo(`pricing_${p.name.toLowerCase().replace(/\s+/g, "_")}`, p.name)}
                   className={`mt-6 ${p.highlight ? "btn-brand" : "btn-secondary"} w-full justify-center`}
                 >
                   {p.cta}
-                </Link>
+                </button>
               </div>
             ))}
           </div>
@@ -409,11 +443,19 @@ export default function Landing() {
             один день, обучение — один час.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/login" className="btn bg-panel px-5 py-3 text-base text-ink-900 hover:bg-panel-muted">
+            <button
+              type="button"
+              onClick={() => openDemo("cta_section_get_demo")}
+              className="btn bg-panel px-5 py-3 text-base text-ink-900 hover:bg-panel-muted"
+            >
               Получить демо
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link to="/app" className="btn bg-white/10 px-5 py-3 text-base text-white backdrop-blur hover:bg-white/15">
+            </button>
+            <Link
+              to="/app"
+              onClick={() => track("cta_clicked", { source: "cta_section_open_app" })}
+              className="btn bg-white/10 px-5 py-3 text-base text-white backdrop-blur hover:bg-white/15"
+            >
               Зайти в приложение
             </Link>
           </div>
@@ -442,6 +484,13 @@ export default function Landing() {
           <p className="text-xs text-ink-600">© {new Date().getFullYear()} Tigim. Все права защищены.</p>
         </div>
       </footer>
+
+      <DemoRequestModal
+        open={demo.open}
+        onClose={closeDemo}
+        source={demo.source}
+        tier={demo.tier}
+      />
     </div>
   );
 }
