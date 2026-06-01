@@ -62,13 +62,41 @@ export interface Order {
   comment?: string;
   stages: Stage[];
   defectsCount: number;
-  costBreakdown: {
-    fabric: number;
-    work: number;
-    accessories: number;
-    packaging: number;
-    defects: number;
-  };
+  costBreakdown: OrderCostBreakdown;
+}
+
+export type ExpenseCategory =
+  | "fabric"
+  | "accessories"
+  | "packaging"
+  | "overhead"
+  | "other";
+
+export interface OrderExpense {
+  id: string;
+  orderId: string;
+  category: ExpenseCategory;
+  description: string | null;
+  amount: number;
+  date: string;
+  sourceMovementId: string | null;
+  createdAt: string;
+}
+
+export interface OrderCostBreakdown {
+  // Ручные/складские расходы по категориям
+  fabric: number;
+  accessories: number;
+  packaging: number;
+  overhead: number;
+  other: number;
+  // Работа
+  laborPerPiece: number;   // сдельщики: Σ work_logs.qty × rate_per_piece
+  laborMonthly: number;    // доля окладов, разнесённая пропорционально выработке месяца
+  // Аггрегаты для обратной совместимости
+  work: number;            // = laborPerPiece + laborMonthly
+  defects: number;
+  total: number;           // сумма всего
 }
 
 export type MaterialType = "ткань" | "фурнитура" | "упаковка" | "нить";

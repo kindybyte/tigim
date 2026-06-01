@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Download,
   ImageIcon,
+  Link2,
   Loader2,
   MessageCircle,
   Phone,
@@ -14,6 +15,7 @@ import {
   AlertTriangle,
   Trash2,
   User,
+  Wallet,
 } from "lucide-react";
 
 import PageHeader from "../components/ui/PageHeader";
@@ -22,6 +24,7 @@ import { OrderStatusBadge, StageStatusBadge } from "../components/ui/Badge";
 import ProgressBar from "../components/ui/ProgressBar";
 import Avatar from "../components/ui/Avatar";
 import WorkLogFormModal from "../components/WorkLogFormModal";
+import OrderExpenseFormModal from "../components/OrderExpenseFormModal";
 import {
   daysUntil,
   defects as mockDefects,
@@ -30,7 +33,7 @@ import {
   formatSom,
   orders as mockOrders,
 } from "../data/mockData";
-import type { Order, Stage } from "../types";
+import type { Order, OrderExpense, Stage } from "../types";
 import { useAuth } from "../lib/auth";
 import { getOrderByNumber, subscribeToOrders } from "../lib/orders";
 import {
@@ -39,6 +42,12 @@ import {
   subscribeToWorkLogs,
   type WorkLog,
 } from "../lib/workLogs";
+import {
+  CATEGORY_LABEL_RU,
+  deleteOrderExpense,
+  listOrderExpenses,
+  subscribeToOrderExpenses,
+} from "../lib/orderExpenses";
 
 export default function OrderDetails() {
   const { id } = useParams<{ id: string }>();
@@ -51,8 +60,10 @@ export default function OrderDetails() {
   const [loading, setLoading] = useState(useRealData);
   const [error, setError] = useState<string | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [expenses, setExpenses] = useState<OrderExpense[]>([]);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logModalStageId, setLogModalStageId] = useState<string | undefined>(undefined);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!useRealData || !id) return;
@@ -61,8 +72,12 @@ export default function OrderDetails() {
       setOrder(row);
       setError(null);
       if (row?.uuid) {
-        const logs = await listWorkLogsForOrder(row.uuid);
+        const [logs, exps] = await Promise.all([
+          listWorkLogsForOrder(row.uuid),
+          listOrderExpenses(row.uuid),
+        ]);
         setWorkLogs(logs);
+        setExpenses(exps);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить заказ");
@@ -76,13 +91,15 @@ export default function OrderDetails() {
     void refetch();
   }, [refetch, useRealData]);
 
-  // Realtime: подхватываем чужие записи выработки и изменения заказа.
+  // Realtime: подхватываем чужие записи выработки, расходы и общие изменения заказа.
   useEffect(() => {
     if (!useRealData || !companyId || !order?.uuid) return;
     const unsubLogs = subscribeToWorkLogs(order.uuid, () => void refetch());
+    const unsubExpenses = subscribeToOrderExpenses(order.uuid, () => void refetch());
     const unsubOrders = subscribeToOrders(companyId, () => void refetch());
     return () => {
       unsubLogs();
+      unsubExpenses();
       unsubOrders();
     };
   }, [useRealData, companyId, order?.uuid, refetch]);
@@ -133,13 +150,42 @@ export default function OrderDetails() {
     }
   }
 
-  const costSum =
-    order.costBreakdown.fabric +
-    order.costBreakdown.work +
-    order.costBreakdown.accessories +
-    order.costBreakdown.packaging +
-    order.costBreakdown.defects;
-  const actualProfit = order.revenue - costSum;
+  async function handleDeleteExpense(expenseId: string) {
+    if (!confirm("Удалить этот расход?")) return;
+    try {
+      await deleteOrderExpense(expenseId);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось удалить");
+    }
+  }
+
+  // Реальная себестоимость уже посчитана getOrderCostBreakdown() в orders lib.
+  const cb = order.costBreakdown;
+  const realTotal = cb.total;
+  const realProfit = order.revenue - realTotal;
+  const realMargin = order.revenue > 0 ? Math.round((realProfit / order.revenue) * 100) : 0;
+  const perUnitCost = order.qty > 0 ? Math.round(realTotal / order.qty) : 0;
+  const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
+
+  // Cтроки таблицы «Из чего себестоимость» — показываем только ненулевые.
+  const breakdownLines: { label: string; value: number; color: string; hint?: string }[] = [
+    { label: "Ткань", value: cb.fabric, color: "bg-brand-500" },
+    { label: "Фурнитура", value: cb.accessories, color: "bg-violet-500" },
+    { label: "Упаковка", value: cb.packaging, color: "bg-amber-500" },
+    { label: "Накладные", value: cb.overhead, color: "bg-slate-500" },
+    { label: "Прочее", value: cb.other, color: "bg-stone-500" },
+    { label: "Сдельная работа", value: cb.laborPerPiece, color: "bg-teal-500", hint: "из выработки" },
+    { label: "Доля окладов", value: cb.laborMonthly, color: "bg-cyan-500", hint: "пропорц. месяц" },
+    { label: "Брак", value: cb.defects, color: "bg-rose-500" },
+  ].filter((b) => b.value > 0);
+  if (breakdownLines.length === 0) {
+    breakdownLines.push({
+      label: "Пока ничего не записано",
+      value: 0,
+      color: "bg-panel-muted",
+    });
+  }
 
   return (
     <div className="animate-fade-in">
@@ -426,52 +472,136 @@ export default function OrderDetails() {
           <Card title="Финансы по заказу">
             <div className="space-y-2 text-sm">
               <Row label="Выручка" value={<span className="font-bold text-ink-900">{formatSom(order.revenue)}</span>} />
-              <Row label="Себестоимость" value={<span className="text-rose-300">−{formatSom(costSum)}</span>} />
+              <Row label="Себестоимость" value={<span className="text-rose-300">−{formatSom(realTotal)}</span>} />
+              <Row
+                label="Себестоимость на ед."
+                value={<span className="text-rose-300 tabular-nums">{formatSom(perUnitCost)}</span>}
+              />
               <div className="divider my-2" />
-              <Row label="Плановая прибыль" value={<span className="font-semibold">{formatSom(order.profit)}</span>} />
-              <Row label="Фактическая прибыль" value={<span className="font-bold text-emerald-300">{formatSom(actualProfit)}</span>} />
-              <Row label="Маржинальность" value={`${order.margin}%`} />
+              <Row label="Прибыль" value={<span className="font-bold text-emerald-300">{formatSom(realProfit)}</span>} />
+              <Row label="Маржинальность" value={`${realMargin}%`} />
             </div>
 
             <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-600">Из чего себестоимость</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-600">
+                Из чего себестоимость
+              </p>
               <ul className="space-y-1.5 text-sm">
-                {[
-                  { l: "Ткань", v: order.costBreakdown.fabric, c: "bg-brand-500" },
-                  { l: "Работа", v: order.costBreakdown.work, c: "bg-teal-500" },
-                  { l: "Фурнитура", v: order.costBreakdown.accessories, c: "bg-violet-500" },
-                  { l: "Упаковка", v: order.costBreakdown.packaging, c: "bg-amber-500" },
-                  { l: "Брак", v: order.costBreakdown.defects, c: "bg-rose-500" },
-                ].map((b) => (
-                  <li key={b.l} className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded ${b.c}`} />
-                    <span className="text-ink-800">{b.l}</span>
-                    <span className="ml-auto tabular-nums text-ink-600">{formatSom(b.v)}</span>
+                {breakdownLines.map((b) => (
+                  <li key={b.label} className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded ${b.color}`} />
+                    <span className="text-ink-800">{b.label}</span>
+                    {b.hint && <span className="text-[10px] text-ink-600">{b.hint}</span>}
+                    <span className="ml-auto tabular-nums text-ink-600">{formatSom(b.value)}</span>
                   </li>
                 ))}
               </ul>
             </div>
           </Card>
+
+          {/* Expenses */}
+          {canLogWork && (
+            <Card
+              title="Расходы по заказу"
+              subtitle={`${expenses.length} ${expenses.length === 1 ? "запись" : "записей"} · ${formatSom(expensesTotal)}`}
+              action={
+                <button
+                  type="button"
+                  onClick={() => setExpenseModalOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-md bg-brand-500/15 px-2 py-1 text-xs font-semibold text-brand-200 hover:bg-brand-500/25"
+                >
+                  <Plus className="h-3 w-3" /> Добавить
+                </button>
+              }
+            >
+              {expenses.length === 0 ? (
+                <div className="rounded-xl bg-panel-muted/40 px-3 py-3 text-xs text-ink-600">
+                  <Wallet className="mr-1 inline-block h-3.5 w-3.5" />
+                  Расходы пока не записаны. Добавьте «Ткань 100 000», «Фурнитура 10 000» и т.д.
+                  по мере поступления.
+                </div>
+              ) : (
+                <ul className="space-y-1.5">
+                  {expenses.map((e) => (
+                    <ExpenseRow
+                      key={e.id}
+                      expense={e}
+                      onDelete={() => void handleDeleteExpense(e.id)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
         </div>
       </div>
 
       {canLogWork && order.uuid && (
-        <WorkLogFormModal
-          open={logModalOpen}
-          onClose={() => setLogModalOpen(false)}
-          onCreated={() => {
-            setLogModalOpen(false);
-            void refetch();
-          }}
-          companyId={companyId!}
-          orderId={order.uuid}
-          orderNumber={order.id}
-          stages={stagesWithId}
-          sizes={order.sizes}
-          defaultStageId={logModalStageId}
-        />
+        <>
+          <WorkLogFormModal
+            open={logModalOpen}
+            onClose={() => setLogModalOpen(false)}
+            onCreated={() => {
+              setLogModalOpen(false);
+              void refetch();
+            }}
+            companyId={companyId!}
+            orderId={order.uuid}
+            orderNumber={order.id}
+            stages={stagesWithId}
+            sizes={order.sizes}
+            defaultStageId={logModalStageId}
+          />
+          <OrderExpenseFormModal
+            open={expenseModalOpen}
+            onClose={() => setExpenseModalOpen(false)}
+            onCreated={() => {
+              setExpenseModalOpen(false);
+              void refetch();
+            }}
+            companyId={companyId!}
+            orderId={order.uuid}
+            orderNumber={order.id}
+          />
+        </>
       )}
     </div>
+  );
+}
+
+function ExpenseRow({ expense, onDelete }: { expense: OrderExpense; onDelete: () => void }) {
+  const isAuto = !!expense.sourceMovementId;
+  return (
+    <li className="flex items-start gap-2 rounded-lg bg-panel-muted/40 px-2 py-1.5 text-xs">
+      <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] font-semibold uppercase text-ink-700">
+        {CATEGORY_LABEL_RU[expense.category]}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-ink-800">
+          {expense.description ?? "—"}
+          {isAuto && (
+            <span
+              title="Создано автоматически из движения склада"
+              className="ml-1 inline-flex items-center text-ink-600"
+            >
+              <Link2 className="inline-block h-3 w-3" />
+            </span>
+          )}
+        </p>
+        <p className="text-[10px] text-ink-600">{formatDateShort(expense.date)}</p>
+      </div>
+      <span className="shrink-0 font-bold tabular-nums text-ink-900">
+        {formatSom(expense.amount)}
+      </span>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Удалить расход"
+        className="ml-1 shrink-0 rounded p-1 text-ink-600 hover:bg-rose-500/15 hover:text-rose-300"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+    </li>
   );
 }
 

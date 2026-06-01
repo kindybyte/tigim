@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import type { OrderCostBreakdown } from "../types";
 
 // ---------- Types returned to UI ----------
 
@@ -191,6 +192,132 @@ export async function getFinanceData(companyId: string): Promise<{
   ].filter((e) => e.value > 0);
 
   return { stats, orderFinancials, monthlyRevenue, monthlyProfit, expensesByCategory };
+}
+
+// ---------- Per-order real cost breakdown ----------
+
+export function emptyCostBreakdown(): OrderCostBreakdown {
+  return {
+    fabric: 0,
+    accessories: 0,
+    packaging: 0,
+    overhead: 0,
+    other: 0,
+    laborPerPiece: 0,
+    laborMonthly: 0,
+    work: 0,
+    defects: 0,
+    total: 0,
+  };
+}
+
+/**
+ * Реальная себестоимость заказа = ручные расходы (order_expenses) +
+ * сдельная работа (work_logs × ставка сдельщика) + доля окладов
+ * (пропорционально выработке месяца) + потери на браке.
+ *
+ * Доля окладов — динамическая: считается по выработке текущего месяца.
+ * После закрытия месяца цифра «фиксируется» естественным образом, т.к.
+ * новые work_logs туда уже не падают. Закрытие месяца руками не нужно.
+ */
+export async function getOrderCostBreakdown(
+  companyId: string,
+  orderUuid: string,
+  orderQty: number,
+): Promise<OrderCostBreakdown> {
+  const supabase = getSupabase();
+  const monthStart = startOfMonth(new Date()).toISOString().slice(0, 10);
+
+  const [
+    expensesRes,
+    orderLogsRes,
+    monthLogsRes,
+    employeesRes,
+    defectsRes,
+  ] = await Promise.all([
+    supabase.from("order_expenses").select("category, amount").eq("order_id", orderUuid),
+    supabase
+      .from("work_logs")
+      .select("qty, employee_id")
+      .eq("order_id", orderUuid),
+    supabase
+      .from("work_logs")
+      .select("qty, order_id")
+      .eq("company_id", companyId)
+      .gte("date", monthStart),
+    supabase
+      .from("employees")
+      .select("id, salary, pay_type, rate_per_piece")
+      .eq("company_id", companyId)
+      .neq("status", "fired"),
+    supabase.from("defects").select("loss").eq("order_id", orderUuid),
+  ]);
+
+  if (expensesRes.error) throw new Error(expensesRes.error.message);
+  if (orderLogsRes.error) throw new Error(orderLogsRes.error.message);
+  if (monthLogsRes.error) throw new Error(monthLogsRes.error.message);
+  if (employeesRes.error) throw new Error(employeesRes.error.message);
+  if (defectsRes.error) throw new Error(defectsRes.error.message);
+
+  // Расходы по категориям
+  const breakdown = emptyCostBreakdown();
+  (expensesRes.data ?? []).forEach((e) => {
+    const cat = e.category as keyof typeof breakdown;
+    if (cat in breakdown) {
+      (breakdown[cat] as number) += num(e.amount);
+    }
+  });
+
+  // Per-piece labor: для логов где сотрудник сдельщик
+  const empById = new Map(
+    (employeesRes.data ?? []).map((e) => [e.id as string, e]),
+  );
+  let laborPerPiece = 0;
+  (orderLogsRes.data ?? []).forEach((l) => {
+    if (!l.employee_id) return;
+    const emp = empById.get(l.employee_id);
+    if (emp?.pay_type === "per_piece") {
+      laborPerPiece += l.qty * num(emp.rate_per_piece);
+    }
+  });
+
+  // Доля окладов: monthlySalaryFund × (qty заказа в месяце / общая qty месяца)
+  const monthlySalaryFund = (employeesRes.data ?? [])
+    .filter((e) => e.pay_type === "monthly")
+    .reduce((s, e) => s + num(e.salary), 0);
+  const monthTotal = (monthLogsRes.data ?? []).reduce((s, l) => s + l.qty, 0);
+  const orderMonthQty = (monthLogsRes.data ?? [])
+    .filter((l) => l.order_id === orderUuid)
+    .reduce((s, l) => s + l.qty, 0);
+  const laborMonthly =
+    monthTotal > 0
+      ? Math.round((monthlySalaryFund * orderMonthQty) / monthTotal)
+      : 0;
+
+  // Брак
+  const defectsLoss = (defectsRes.data ?? []).reduce(
+    (s, d) => s + num(d.loss),
+    0,
+  );
+
+  breakdown.laborPerPiece = Math.round(laborPerPiece);
+  breakdown.laborMonthly = laborMonthly;
+  breakdown.work = breakdown.laborPerPiece + breakdown.laborMonthly;
+  breakdown.defects = Math.round(defectsLoss);
+  breakdown.total =
+    breakdown.fabric +
+    breakdown.accessories +
+    breakdown.packaging +
+    breakdown.overhead +
+    breakdown.other +
+    breakdown.work +
+    breakdown.defects;
+
+  // orderQty используется только для контракта функции (его читает вызов
+  // выше для расчёта per-unit); сам breakdown в нём не нуждается.
+  void orderQty;
+
+  return breakdown;
 }
 
 // ---------- Employee productivity ----------

@@ -5,7 +5,30 @@ import type {
   Employee,
   Material,
   Order,
+  OrderCostBreakdown,
 } from "../types";
+
+// Демо-моки не различают сдельную и окладную работу — кладём всё в labourPerPiece.
+function mockCost(
+  fabric: number,
+  work: number,
+  accessories: number,
+  packaging: number,
+  defects: number,
+): OrderCostBreakdown {
+  return {
+    fabric,
+    accessories,
+    packaging,
+    overhead: 0,
+    other: 0,
+    laborPerPiece: work,
+    laborMonthly: 0,
+    work,
+    defects,
+    total: fabric + accessories + packaging + work + defects,
+  };
+}
 
 export const company = {
   name: "Цех «Бишкек Текстиль»",
@@ -72,13 +95,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Ожидает", responsible: "—", progress: 0 },
     ],
     defectsCount: 14,
-    costBreakdown: {
-      fabric: 120000,
-      work: 95000,
-      accessories: 25000,
-      packaging: 12000,
-      defects: 5800,
-    },
+    costBreakdown: mockCost(120000, 95000, 25000, 12000, 5800),
   },
   {
     id: "1046",
@@ -121,13 +138,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Ожидает", responsible: "—", progress: 0 },
     ],
     defectsCount: 3,
-    costBreakdown: {
-      fabric: 165000,
-      work: 84000,
-      accessories: 24000,
-      packaging: 9000,
-      defects: 1200,
-    },
+    costBreakdown: mockCost(165000, 84000, 24000, 9000, 1200),
   },
   {
     id: "1047",
@@ -171,13 +182,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Ожидает", responsible: "—", progress: 0 },
     ],
     defectsCount: 22,
-    costBreakdown: {
-      fabric: 210000,
-      work: 168000,
-      accessories: 38000,
-      packaging: 20000,
-      defects: 12000,
-    },
+    costBreakdown: mockCost(210000, 168000, 38000, 20000, 12000),
   },
   {
     id: "1048",
@@ -212,7 +217,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Ожидает", responsible: "—", progress: 0 },
     ],
     defectsCount: 0,
-    costBreakdown: { fabric: 0, work: 0, accessories: 0, packaging: 0, defects: 0 },
+    costBreakdown: mockCost(0, 0, 0, 0, 0),
   },
   {
     id: "1049",
@@ -248,7 +253,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Завершено", responsible: "—", finishedAt: "2026-05-21", progress: 100 },
     ],
     defectsCount: 8,
-    costBreakdown: { fabric: 64000, work: 50000, accessories: 14000, packaging: 5000, defects: 3000 },
+    costBreakdown: mockCost(64000, 50000, 14000, 5000, 3000),
   },
   {
     id: "1050",
@@ -284,7 +289,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Ожидает", responsible: "—", progress: 0 },
     ],
     defectsCount: 18,
-    costBreakdown: { fabric: 45000, work: 18000, accessories: 6000, packaging: 0, defects: 9000 },
+    costBreakdown: mockCost(45000, 18000, 6000, 0, 9000),
   },
   {
     id: "1051",
@@ -320,7 +325,7 @@ export const orders: Order[] = [
       { name: "Готово", status: "Завершено", responsible: "—", finishedAt: "2026-05-17", progress: 100 },
     ],
     defectsCount: 5,
-    costBreakdown: { fabric: 105000, work: 78000, accessories: 22000, packaging: 8000, defects: 3000 },
+    costBreakdown: mockCost(105000, 78000, 22000, 8000, 3000),
   },
 ];
 

@@ -1,5 +1,15 @@
 import { getSupabase } from "./supabase";
-import type { Order, OrderStatus, Priority, SizeBreakdown, Stage, StageName, StageStatus } from "../types";
+import { emptyCostBreakdown, getOrderCostBreakdown } from "./finance";
+import type {
+  Order,
+  OrderCostBreakdown,
+  OrderStatus,
+  Priority,
+  SizeBreakdown,
+  Stage,
+  StageName,
+  StageStatus,
+} from "../types";
 
 // --- DB row shapes ---
 
@@ -71,11 +81,14 @@ function mapOrder(
   stages: StageRow[] = [],
   responsibleNamesById: Record<string, string> = {},
   defectsCount = 0,
+  costBreakdown: OrderCostBreakdown = emptyCostBreakdown(),
 ): Order {
   const unitPrice = num(row.unit_price);
   const unitCost = num(row.unit_cost);
   const revenue = unitPrice * row.qty;
-  const cost = unitCost * row.qty;
+  // Если реальной себестоимости ещё нет (заказ только создан, расходы
+  // не вписаны) — fallback на плановую через unit_cost.
+  const cost = costBreakdown.total > 0 ? costBreakdown.total : unitCost * row.qty;
   const profit = revenue - cost;
   const margin = revenue > 0 ? Math.round((profit / revenue) * 100) : 0;
 
@@ -114,13 +127,7 @@ function mapOrder(
         ),
       ),
     defectsCount,
-    costBreakdown: {
-      fabric: 0,
-      work: 0,
-      accessories: 0,
-      packaging: 0,
-      defects: 0,
-    },
+    costBreakdown,
   };
 }
 
@@ -178,17 +185,21 @@ export async function getOrderByNumber(
     responsibleNamesById[e.id] = e.name;
   });
 
-  const { count: defectsCount } = await supabase
-    .from("defects")
-    .select("*", { count: "exact", head: true })
-    .eq("order_id", row.id);
+  const [defectsRes, costBreakdown] = await Promise.all([
+    supabase
+      .from("defects")
+      .select("*", { count: "exact", head: true })
+      .eq("order_id", row.id),
+    getOrderCostBreakdown(companyId, row.id, row.qty),
+  ]);
 
   return mapOrder(
     row as OrderRow,
     (row.order_sizes as SizeRow[] | null) ?? [],
     (row.order_stages as StageRow[] | null) ?? [],
     responsibleNamesById,
-    defectsCount ?? 0,
+    defectsRes.count ?? 0,
+    costBreakdown,
   );
 }
 
