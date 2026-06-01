@@ -104,13 +104,24 @@ export type DefectReason =
   | "Ошибка вышивки/печати"
   | "Повреждение ткани";
 
-export type EmployeeRole =
-  | "Закройщик"
-  | "Швея"
-  | "ОТК"
-  | "Упаковщик"
-  | "Менеджер"
-  | "Мастер цеха";
+// Distinct from a literal union: real workshops have roles outside the original
+// six (Технолог, Кладовщик, Контролёр ОТК, etc.). Stored as free text.
+export type EmployeeRole = string;
+
+// Подсказки в выпадашке формы. Можно ввести и любую другую должность.
+export const COMMON_EMPLOYEE_ROLES = [
+  "Швея",
+  "Закройщик",
+  "ОТК",
+  "Упаковщик",
+  "Мастер цеха",
+  "Менеджер",
+  "Технолог",
+  "Кладовщик",
+  "Гладильщик",
+] as const;
+
+export type PayType = "monthly" | "per_piece";
 
 export interface Employee {
   id: string;
@@ -119,9 +130,11 @@ export interface Employee {
   stage: StageName;
   monthDone: number; // изделия за месяц
   defectsPct: number; // 0..100
-  salary: number; // сом
+  payType: PayType;
+  salary: number; // сом — для monthly: оклад; для per_piece: фикс/аванс (часто 0)
+  ratePerPiece: number; // сом за единицу при сдельной оплате
   status: "active" | "vacation" | "sick";
-  norm: number; // план в месяц
+  norm: number; // план в месяц (только для monthly)
   avatarColor: string;
 }
 

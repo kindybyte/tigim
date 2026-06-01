@@ -77,7 +77,7 @@ export async function exportDefectsXlsx(companyId: string): Promise<void> {
 export async function exportEmployeesXlsx(companyId: string): Promise<void> {
   const { data, error } = await getSupabase()
     .from("employees")
-    .select("name, role, stage, norm, salary, status")
+    .select("name, role, stage, norm, pay_type, salary, rate_per_piece, status")
     .eq("company_id", companyId)
     .order("name", { ascending: true });
   if (error) throw new Error(error.message);
@@ -87,7 +87,9 @@ export async function exportEmployeesXlsx(companyId: string): Promise<void> {
     "Должность": e.role,
     "Этап": e.stage ?? "",
     "Норма, шт": e.norm,
-    "Зарплата, сом": Number(e.salary),
+    "Тип оплаты": e.pay_type === "per_piece" ? "сдельно" : "оклад",
+    "Оклад, сом/мес": e.pay_type === "monthly" ? Number(e.salary) : "",
+    "Ставка, сом/шт": e.pay_type === "per_piece" ? Number(e.rate_per_piece) : "",
     "Статус": e.status,
   }));
 

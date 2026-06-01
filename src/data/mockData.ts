@@ -338,15 +338,15 @@ export const materials: Material[] = [
 ];
 
 export const employees: Employee[] = [
-  { id: "e1", name: "Эркин Бекболотов", role: "Закройщик", stage: "Раскрой", monthDone: 1850, defectsPct: 1.2, salary: 45000, status: "active", norm: 1600, avatarColor: "#2563EB" },
-  { id: "e2", name: "Гульнара Асанова", role: "Швея", stage: "Пошив", monthDone: 720, defectsPct: 1.8, salary: 38000, status: "active", norm: 600, avatarColor: "#06B6D4" },
-  { id: "e3", name: "Айнура Касымова", role: "Швея", stage: "Печать/вышивка", monthDone: 540, defectsPct: 0.9, salary: 36000, status: "active", norm: 500, avatarColor: "#8B5CF6" },
-  { id: "e4", name: "Назгуль Орозалиева", role: "ОТК", stage: "ОТК", monthDone: 2400, defectsPct: 0.3, salary: 32000, status: "active", norm: 2200, avatarColor: "#F59E0B" },
-  { id: "e5", name: "Чолпон Сатылганова", role: "Упаковщик", stage: "Упаковка", monthDone: 2150, defectsPct: 0.1, salary: 28000, status: "active", norm: 2000, avatarColor: "#EF4444" },
-  { id: "e6", name: "Бакыт Маматов", role: "Мастер цеха", stage: "Пошив", monthDone: 0, defectsPct: 0, salary: 55000, status: "active", norm: 0, avatarColor: "#1D4ED8" },
-  { id: "e7", name: "Айбек Турдубеков", role: "Менеджер", stage: "Пошив", monthDone: 0, defectsPct: 0, salary: 60000, status: "active", norm: 0, avatarColor: "#2563EB" },
-  { id: "e8", name: "Жылдыз Кенжебаева", role: "Швея", stage: "Пошив", monthDone: 480, defectsPct: 3.4, salary: 30000, status: "active", norm: 600, avatarColor: "#22D3EE" },
-  { id: "e9", name: "Айгерим Бектурова", role: "Швея", stage: "Пошив", monthDone: 610, defectsPct: 1.1, salary: 34000, status: "vacation", norm: 600, avatarColor: "#EC4899" },
+  { id: "e1", name: "Эркин Бекболотов", role: "Закройщик", stage: "Раскрой", monthDone: 1850, defectsPct: 1.2, payType: "monthly", salary: 45000, ratePerPiece: 0, status: "active", norm: 1600, avatarColor: "#2563EB" },
+  { id: "e2", name: "Гульнара Асанова", role: "Швея", stage: "Пошив", monthDone: 720, defectsPct: 1.8, payType: "per_piece", salary: 0, ratePerPiece: 55, status: "active", norm: 600, avatarColor: "#06B6D4" },
+  { id: "e3", name: "Айнура Касымова", role: "Швея", stage: "Печать/вышивка", monthDone: 540, defectsPct: 0.9, payType: "per_piece", salary: 0, ratePerPiece: 60, status: "active", norm: 500, avatarColor: "#8B5CF6" },
+  { id: "e4", name: "Назгуль Орозалиева", role: "ОТК", stage: "ОТК", monthDone: 2400, defectsPct: 0.3, payType: "monthly", salary: 32000, ratePerPiece: 0, status: "active", norm: 2200, avatarColor: "#F59E0B" },
+  { id: "e5", name: "Чолпон Сатылганова", role: "Упаковщик", stage: "Упаковка", monthDone: 2150, defectsPct: 0.1, payType: "per_piece", salary: 0, ratePerPiece: 12, status: "active", norm: 2000, avatarColor: "#EF4444" },
+  { id: "e6", name: "Бакыт Маматов", role: "Мастер цеха", stage: "Пошив", monthDone: 0, defectsPct: 0, payType: "monthly", salary: 55000, ratePerPiece: 0, status: "active", norm: 0, avatarColor: "#1D4ED8" },
+  { id: "e7", name: "Айбек Турдубеков", role: "Технолог", stage: "Пошив", monthDone: 0, defectsPct: 0, payType: "monthly", salary: 60000, ratePerPiece: 0, status: "active", norm: 0, avatarColor: "#2563EB" },
+  { id: "e8", name: "Жылдыз Кенжебаева", role: "Швея", stage: "Пошив", monthDone: 480, defectsPct: 3.4, payType: "per_piece", salary: 0, ratePerPiece: 50, status: "active", norm: 600, avatarColor: "#22D3EE" },
+  { id: "e9", name: "Айгерим Бектурова", role: "Швея", stage: "Пошив", monthDone: 610, defectsPct: 1.1, payType: "per_piece", salary: 0, ratePerPiece: 55, status: "vacation", norm: 600, avatarColor: "#EC4899" },
 ];
 
 export const defects: Defect[] = [

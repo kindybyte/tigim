@@ -52,7 +52,12 @@ export default function Employees() {
     [employees, query],
   );
 
-  const totalSalary = employees.reduce((s, e) => s + e.salary, 0);
+  // Фонд оплаты: оклад для monthly + (ставка × сделано) для per_piece.
+  // Для per_piece это оценка по факту выработки за месяц.
+  const totalSalary = employees.reduce((s, e) => {
+    if (e.payType === "per_piece") return s + e.monthDone * e.ratePerPiece;
+    return s + e.salary;
+  }, 0);
   const avgDefects =
     employees.length > 0
       ? employees.reduce((s, e) => s + e.defectsPct, 0) / employees.length
@@ -176,8 +181,23 @@ export default function Employees() {
                           <span className="text-xs text-ink-600">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right align-middle font-semibold text-ink-900 tabular-nums">
-                        {formatSom(e.salary)}
+                      <td className="px-3 py-3 text-right align-middle">
+                        {e.payType === "per_piece" ? (
+                          <div className="flex flex-col items-end">
+                            <span className="font-semibold text-ink-900 tabular-nums">
+                              {formatSom(e.ratePerPiece)} / шт
+                            </span>
+                            {e.monthDone > 0 && (
+                              <span className="text-[11px] text-ink-600 tabular-nums">
+                                ≈ {formatSom(e.monthDone * e.ratePerPiece)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-ink-900 tabular-nums">
+                            {formatSom(e.salary)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3 align-middle">
                         {e.status === "active" && <Badge tone="success" dot>На смене</Badge>}

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   AlertTriangle,
   Clock,
   Filter,
+  GripVertical,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -83,10 +84,13 @@ export default function Production() {
     });
   }, [useRealData, companyId, refetch]);
 
-  // DnD sensors — drag starts only after 8px of movement, so clicks still navigate
+  // DnD sensors. PointerSensor handles mouse + pen (any move beyond 8px starts
+  // the drag, so a click still navigates). TouchSensor only fires when the
+  // user grabs the dedicated drag handle on the card — see KanbanCard below —
+  // so a tap anywhere else on the card navigates to the order detail.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 120, tolerance: 8 } }),
   );
 
   function handleDragStart(e: DragStartEvent) {
@@ -237,7 +241,6 @@ function Column({
 }
 
 function KanbanCard({ order, isDragging }: { order: Order; isDragging: boolean }) {
-  const navigate = useNavigate();
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: order.id });
 
   const dleft = useMemo(() => (order.deadline ? daysUntil(order.deadline) : 99), [order.deadline]);
@@ -256,71 +259,80 @@ function KanbanCard({ order, isDragging }: { order: Order; isDragging: boolean }
       }
     : undefined;
 
-  function onCardClick(e: React.MouseEvent) {
-    // Avoid navigation while a drag was in progress — dnd-kit fires no click
-    // on real drags thanks to distance constraint, but cheap safety check.
-    if (isDragging) {
-      e.preventDefault();
-      return;
-    }
-    navigate(`/app/orders/${order.id}`);
-  }
-
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
-      onClick={onCardClick}
-      className={`block cursor-grab select-none rounded-xl border border-panel-border bg-panel p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft border-l-4 ${accent} ${
-        isDragging ? "opacity-60 cursor-grabbing" : ""
+      className={`relative rounded-xl border border-panel-border bg-panel shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft border-l-4 ${accent} ${
+        isDragging ? "opacity-60" : ""
       }`}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-ink-600">#{order.id}</p>
-        {order.priority === "high" && (
-          <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">!</span>
-        )}
-      </div>
-      <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-ink-900">
-        {order.product}
-      </p>
-      <p className="mt-0.5 truncate text-[11px] text-ink-600">{order.client}</p>
+      {/* Drag handle — listeners are scoped here so tapping the body
+          navigates instead of starting a drag. `touch-action: none`
+          tells the browser not to hijack the touch for scrolling once
+          the user grabs the handle. */}
+      <button
+        type="button"
+        aria-label="Перетащить заказ"
+        {...listeners}
+        {...attributes}
+        style={{ touchAction: "none" }}
+        className="absolute right-1 top-1 z-10 grid h-8 w-8 cursor-grab touch-none place-items-center rounded-lg text-ink-600 hover:bg-panel-muted hover:text-ink-900 active:cursor-grabbing"
+        onClick={(e) => e.preventDefault()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
 
-      <div className="mt-3 flex items-center justify-between text-xs">
-        <span className="rounded-md bg-panel-muted px-1.5 py-0.5 font-semibold text-ink-700">
-          {formatNumber(order.qty)} шт
-        </span>
-        {order.deadline && (
-          <span
-            className={`inline-flex items-center gap-1 font-semibold ${
-              danger ? "text-rose-300" : warn ? "text-amber-300" : "text-emerald-300"
-            }`}
-          >
-            {danger ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-            {formatDateShort(order.deadline)}
-          </span>
-        )}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Avatar name={order.responsible} color="#2563EB" size="xs" />
-          <span className="text-[11px] text-ink-600">{order.responsible.split(" ")[0]}</span>
+      <Link
+        to={`/app/orders/${order.id}`}
+        draggable={false}
+        className="block p-3 pr-9"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-ink-600">#{order.id}</p>
+          {order.priority === "high" && (
+            <span className="rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold text-rose-300">!</span>
+          )}
         </div>
-        <span className="text-[11px] font-semibold tabular-nums text-ink-800">
-          {order.progress}%
-        </span>
-      </div>
-      <div className="mt-1.5 h-1 w-full rounded-full bg-panel-muted">
-        <div
-          className={`h-1 rounded-full ${
-            danger ? "bg-rose-500" : warn ? "bg-amber-500" : "bg-emerald-500"
-          }`}
-          style={{ width: `${order.progress}%` }}
-        />
-      </div>
+        <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-ink-900">
+          {order.product}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-ink-600">{order.client}</p>
+
+        <div className="mt-3 flex items-center justify-between text-xs">
+          <span className="rounded-md bg-panel-muted px-1.5 py-0.5 font-semibold text-ink-700">
+            {formatNumber(order.qty)} шт
+          </span>
+          {order.deadline && (
+            <span
+              className={`inline-flex items-center gap-1 font-semibold ${
+                danger ? "text-rose-300" : warn ? "text-amber-300" : "text-emerald-300"
+              }`}
+            >
+              {danger ? <AlertTriangle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+              {formatDateShort(order.deadline)}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Avatar name={order.responsible} color="#2563EB" size="xs" />
+            <span className="text-[11px] text-ink-600">{order.responsible.split(" ")[0]}</span>
+          </div>
+          <span className="text-[11px] font-semibold tabular-nums text-ink-800">
+            {order.progress}%
+          </span>
+        </div>
+        <div className="mt-1.5 h-1 w-full rounded-full bg-panel-muted">
+          <div
+            className={`h-1 rounded-full ${
+              danger ? "bg-rose-500" : warn ? "bg-amber-500" : "bg-emerald-500"
+            }`}
+            style={{ width: `${order.progress}%` }}
+          />
+        </div>
+      </Link>
     </div>
   );
 }
