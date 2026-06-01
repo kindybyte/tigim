@@ -82,6 +82,59 @@ export async function getRoleCounts(companyId: string): Promise<RoleCounts> {
   return counts;
 }
 
+// ---------- Members ----------
+
+export interface CompanyMember {
+  id: string;            // company_members.id
+  userId: string;        // profiles.id = auth.users.id
+  fullName: string;
+  role: VisibleRole | "master";
+  joinedAt: string;
+}
+
+interface CompanyMemberRow {
+  id: string;
+  user_id: string;
+  role: VisibleRole | "master";
+  created_at: string;
+  profiles?: { id: string; full_name: string | null } | null;
+}
+
+export async function getCompanyMembers(companyId: string): Promise<CompanyMember[]> {
+  const { data, error } = await getSupabase()
+    .from("company_members")
+    .select(`id, user_id, role, created_at, profiles ( id, full_name )`)
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data as unknown as CompanyMemberRow[]) ?? []).map((r) => ({
+    id: r.id,
+    userId: r.user_id,
+    fullName: r.profiles?.full_name ?? "—",
+    role: r.role,
+    joinedAt: r.created_at,
+  }));
+}
+
+export async function updateMemberRole(
+  memberId: string,
+  role: VisibleRole,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("company_members")
+    .update({ role })
+    .eq("id", memberId);
+  if (error) throw new Error(error.message);
+}
+
+export async function removeMember(memberId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("company_members")
+    .delete()
+    .eq("id", memberId);
+  if (error) throw new Error(error.message);
+}
+
 export async function updateCompany(
   companyId: string,
   patch: UpdateCompanyInput,

@@ -1,13 +1,16 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Loader2, Mail, UserPlus } from "lucide-react";
 import Logo from "../components/ui/Logo";
 import DemoModeBanner from "../components/DemoModeBanner";
 import { useAuth } from "../lib/auth";
+import { rememberInviteToken } from "../lib/invitations";
 
 export default function Signup() {
   const { signUp, configured } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get("invite");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,6 +19,12 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+
+  // Если зашли по ссылке-приглашению — сразу сохраняем токен в localStorage,
+  // чтобы после email-подтверждения и логина Onboarding его подхватил.
+  useEffect(() => {
+    if (inviteToken) rememberInviteToken(inviteToken);
+  }, [inviteToken]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -70,8 +79,19 @@ export default function Signup() {
             <>
               <h1 className="text-2xl font-bold tracking-tight text-ink-900">Создать аккаунт</h1>
               <p className="mt-1 text-sm text-ink-600">
-                14 дней бесплатно. Без банковской карты.
+                {inviteToken
+                  ? "Вас пригласили в существующую компанию."
+                  : "14 дней бесплатно. Без банковской карты."}
               </p>
+
+              {inviteToken && (
+                <div className="mt-4 flex items-start gap-2 rounded-xl bg-brand-500/15 px-3 py-2.5 text-xs text-brand-200 ring-1 ring-brand-500/30">
+                  <UserPlus className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    После регистрации и подтверждения email вы автоматически попадёте в компанию которая вас пригласила — со своей ролью доступа.
+                  </span>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                 <div>

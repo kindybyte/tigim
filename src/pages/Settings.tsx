@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import {
+  AlertTriangle,
   Bell,
   Boxes,
   Briefcase,
@@ -12,7 +14,9 @@ import {
   Save,
   Shield,
   ShieldCheck,
+  Trash2,
   User,
+  UserPlus,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,9 +25,24 @@ import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
-import { company as mockCompany, employees } from "../data/mockData";
+import ChangeRoleModal from "../components/ChangeRoleModal";
+import InviteUserModal from "../components/InviteUserModal";
+import { company as mockCompany } from "../data/mockData";
 import { useAuth } from "../lib/auth";
-import { getRoleCounts, updateCompany, type VisibleRole } from "../lib/company";
+import {
+  getCompanyMembers,
+  getRoleCounts,
+  removeMember,
+  updateCompany,
+  type CompanyMember,
+  type VisibleRole,
+} from "../lib/company";
+import {
+  inviteUrl,
+  listInvitations,
+  revokeInvitation,
+  type Invitation,
+} from "../lib/invitations";
 
 const TABS = [
   { key: "company", label: "Компания", icon: Building2 },
@@ -34,6 +53,18 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+// Человекочитаемая подпись роли.
+function roleLabel(role: VisibleRole | "master"): string {
+  switch (role) {
+    case "owner": return "Владелец";
+    case "manager": return "Менеджер";
+    case "warehouse": return "Склад";
+    case "qc": return "ОТК";
+    case "staff": return "Сотрудник";
+    case "master": return "Мастер цеха";
+  }
+}
 
 // Русское склонение «человек / человека / людей» для счётчика 0..n.
 function pluralPeople(n: number): string {
@@ -136,7 +167,7 @@ const INTEGRATIONS = [
 
 export default function Settings() {
   const [tab, setTab] = useState<TabKey>("company");
-  const { configured, companyId, company, refreshCompany } = useAuth();
+  const { configured, companyId, company, refreshCompany, user } = useAuth();
   const isReal = configured && !!companyId && !!company;
 
   // --- Роли: счётчики пользователей ---
@@ -159,6 +190,73 @@ export default function Settings() {
   useEffect(() => {
     if (tab === "roles") void fetchRoleCounts();
   }, [tab, fetchRoleCounts]);
+
+  // --- Пользователи: реальные company_members ---
+  const [members, setMembers] = useState<CompanyMember[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [changeRoleFor, setChangeRoleFor] = useState<CompanyMember | null>(null);
+
+  const isOwner = members.find((m) => m.userId === user?.id)?.role === "owner";
+  const ownerCount = members.filter((m) => m.role === "owner").length;
+
+  const fetchUsers = useCallback(async () => {
+    if (!isReal || !companyId) return;
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const [m, i] = await Promise.all([
+        getCompanyMembers(companyId),
+        // listInvitations может вернуть [] для неowner из-за RLS — не ошибка.
+        listInvitations(companyId).catch(() => [] as Invitation[]),
+      ]);
+      setMembers(m);
+      setInvitations(i.filter((inv) => !inv.acceptedAt));
+    } catch (err) {
+      setUsersError(err instanceof Error ? err.message : "Не удалось загрузить пользователей");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [isReal, companyId]);
+
+  useEffect(() => {
+    if (tab === "users") void fetchUsers();
+  }, [tab, fetchUsers]);
+
+  async function handleRevokeInvitation(id: string) {
+    if (!confirm("Отозвать приглашение? Ссылка перестанет работать.")) return;
+    try {
+      await revokeInvitation(id);
+      await fetchUsers();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось отозвать");
+    }
+  }
+
+  async function handleRemoveMember(member: CompanyMember) {
+    if (member.userId === user?.id) {
+      alert("Удалить самого себя нельзя. Передайте роль владельца другому или выйдите через signout.");
+      return;
+    }
+    if (!confirm(`Удалить ${member.fullName} из компании? Он потеряет доступ к данным.`)) return;
+    try {
+      await removeMember(member.id);
+      await fetchUsers();
+      await fetchRoleCounts();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось удалить");
+    }
+  }
+
+  async function copyInviteLink(token: string) {
+    try {
+      await navigator.clipboard.writeText(inviteUrl(token));
+    } catch {
+      /* ignore */
+    }
+  }
 
   // Локальное состояние формы (синхронизируется с context при загрузке)
   const [name, setName] = useState("");
@@ -311,25 +409,153 @@ export default function Settings() {
           )}
 
           {tab === "users" && (
-            <Card title="Пользователи" subtitle={`${employees.length} активных пользователей`}>
-              <ul className="divide-y divide-panel-border">
-                {employees.map((e) => (
-                  <li key={e.id} className="flex flex-wrap items-center gap-3 py-3">
-                    <Avatar name={e.name} color={e.avatarColor} size="sm" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-ink-900">{e.name}</p>
-                      <p className="text-xs text-ink-600">{e.role}</p>
-                    </div>
-                    <Badge tone={e.status === "active" ? "success" : "neutral"} dot>
-                      {e.status === "active" ? "Активен" : e.status === "vacation" ? "Отпуск" : "Болен"}
-                    </Badge>
-                    <button className="btn-ghost text-sm">Изменить</button>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 flex justify-end">
-                <button className="btn-brand">Пригласить пользователя</button>
+            <Card
+              title="Пользователи"
+              subtitle="Люди с логином в Tigim. У каждого свой email и роль доступа."
+              action={
+                isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => setInviteOpen(true)}
+                    className="btn-brand text-sm"
+                  >
+                    <UserPlus className="h-4 w-4" /> Пригласить
+                  </button>
+                )
+              }
+            >
+              <div className="mb-4 rounded-xl bg-brand-500/10 px-4 py-3 text-xs text-brand-200 ring-1 ring-brand-500/20">
+                Это не работники цеха. Швеи, закройщицы, упаковщики и другие сотрудники — в разделе{" "}
+                <Link to="/app/employees" className="font-semibold underline hover:text-brand-100">
+                  Сотрудники
+                </Link>
+                . Логин им не нужен — выработку записываете вы как мастер.
               </div>
+
+              {!isReal && (
+                <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
+                  Демо-режим: список пользователей доступен только в реальной компании.
+                </p>
+              )}
+
+              {isReal && usersLoading && (
+                <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-600">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Загружаем…
+                </div>
+              )}
+
+              {isReal && usersError && (
+                <div className="rounded-xl bg-rose-500/15 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/30">
+                  {usersError}{" "}
+                  <button onClick={() => void fetchUsers()} className="font-semibold underline">
+                    Повторить
+                  </button>
+                </div>
+              )}
+
+              {isReal && !usersLoading && !usersError && (
+                <>
+                  <ul className="divide-y divide-panel-border">
+                    {members.map((m) => {
+                      const isSelf = m.userId === user?.id;
+                      const isLastOwner = m.role === "owner" && ownerCount === 1;
+                      return (
+                        <li key={m.id} className="flex flex-wrap items-center gap-3 py-3">
+                          <Avatar name={m.fullName} color="#2563EB" size="sm" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-ink-900">
+                              {m.fullName}
+                              {isSelf && (
+                                <span className="ml-2 text-[10px] font-medium text-ink-600">вы</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-ink-600">
+                              {roleLabel(m.role)}
+                              {m.role === "master" && (
+                                <span className="ml-1 text-amber-200">· устаревшая</span>
+                              )}
+                            </p>
+                          </div>
+                          <Badge tone={m.role === "owner" ? "brand" : "neutral"} dot>
+                            {roleLabel(m.role)}
+                          </Badge>
+                          {isOwner && (
+                            <>
+                              <button
+                                onClick={() => setChangeRoleFor(m)}
+                                className="text-xs font-semibold text-brand-300 hover:text-brand-200"
+                              >
+                                Изменить роль
+                              </button>
+                              {!isSelf && !isLastOwner && (
+                                <button
+                                  onClick={() => void handleRemoveMember(m)}
+                                  aria-label="Удалить из компании"
+                                  className="rounded p-1 text-ink-600 hover:bg-rose-500/15 hover:text-rose-300"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {/* Pending invitations */}
+                  {isOwner && invitations.length > 0 && (
+                    <div className="mt-6">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-600">
+                        Ожидают регистрации
+                      </p>
+                      <ul className="space-y-2">
+                        {invitations.map((inv) => {
+                          const expired = new Date(inv.expiresAt) < new Date();
+                          return (
+                            <li
+                              key={inv.id}
+                              className="flex flex-wrap items-center gap-3 rounded-lg bg-panel-muted/40 px-3 py-2 text-sm"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-medium text-ink-800">{inv.email}</p>
+                                <p className="text-[11px] text-ink-600">
+                                  Роль: {roleLabel(inv.role)}
+                                  {expired && (
+                                    <span className="ml-1 text-rose-300">
+                                      <AlertTriangle className="mr-0.5 inline h-3 w-3" />
+                                      истёкло
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => void copyInviteLink(inv.token)}
+                                className="text-xs font-semibold text-brand-300 hover:text-brand-200"
+                              >
+                                Копировать ссылку
+                              </button>
+                              <button
+                                onClick={() => void handleRevokeInvitation(inv.id)}
+                                aria-label="Отозвать приглашение"
+                                className="rounded p-1 text-ink-600 hover:bg-rose-500/15 hover:text-rose-300"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+
+                  {members.length === 1 && (
+                    <p className="mt-4 rounded-lg bg-panel-muted/40 px-3 py-2 text-xs text-ink-600">
+                      Вы пока единственный пользователь. Нажмите «Пригласить» чтобы добавить менеджера, склад или ОТК.
+                    </p>
+                  )}
+                </>
+              )}
             </Card>
           )}
 
@@ -455,6 +681,35 @@ export default function Settings() {
           )}
         </div>
       </div>
+
+      {/* Modals */}
+      {isReal && companyId && (
+        <>
+          <InviteUserModal
+            open={inviteOpen}
+            onClose={() => setInviteOpen(false)}
+            onCreated={() => void fetchUsers()}
+            companyId={companyId}
+          />
+          {changeRoleFor && (
+            <ChangeRoleModal
+              open={!!changeRoleFor}
+              onClose={() => setChangeRoleFor(null)}
+              onSaved={() => {
+                setChangeRoleFor(null);
+                void fetchUsers();
+                void fetchRoleCounts();
+                void refreshCompany();
+              }}
+              memberId={changeRoleFor.id}
+              memberName={changeRoleFor.fullName}
+              currentRole={changeRoleFor.role}
+              isSelf={changeRoleFor.userId === user?.id}
+              isLastOwner={changeRoleFor.role === "owner" && ownerCount === 1}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

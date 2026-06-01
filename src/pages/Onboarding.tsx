@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,8 +17,9 @@ import {
 import Logo from "../components/ui/Logo";
 import { useAuth } from "../lib/auth";
 import { getSupabase, supabaseConfigured } from "../lib/supabase";
+import { popInviteToken, redeemInvitation } from "../lib/invitations";
 
-type Step = "welcome" | "company" | "done";
+type Step = "welcome" | "company" | "done" | "redeeming" | "invite_failed";
 
 const FEATURES = [
   { icon: ClipboardList, text: "Все заказы и этапы в одном окне" },
@@ -41,6 +42,27 @@ export default function Onboarding() {
   const [timezone, setTimezone] = useState("Asia/Bishkek");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  // На старте — если в localStorage висит invite token, погашаем его и
+  // отправляем пользователя в приложение. Свою компанию НЕ создаём.
+  useEffect(() => {
+    if (!configured || !user) return;
+    const token = popInviteToken();
+    if (!token) return;
+
+    setStep("redeeming");
+    redeemInvitation(token)
+      .then(async () => {
+        await refreshCompany();
+        navigate("/app", { replace: true });
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        setInviteError(translateInviteError(msg));
+        setStep("invite_failed");
+      });
+  }, [configured, user, refreshCompany, navigate]);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -110,8 +132,33 @@ export default function Onboarding() {
 
       <main className="flex items-start justify-center px-4 py-10 sm:py-16">
         <div className="w-full max-w-xl">
-          {/* Progress */}
-          <ProgressBar step={step} />
+          {/* Progress (скрыт во время приёма приглашения) */}
+          {step !== "redeeming" && step !== "invite_failed" && <ProgressBar step={step} />}
+
+          {step === "redeeming" && (
+            <div className="rounded-2xl border border-panel-border bg-panel p-8 text-center shadow-soft">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand-300" />
+              <p className="mt-4 text-sm text-ink-700">Принимаем приглашение в команду…</p>
+            </div>
+          )}
+
+          {step === "invite_failed" && (
+            <div className="rounded-2xl border border-panel-border bg-panel p-8 shadow-soft">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30">
+                <ArrowLeft className="h-6 w-6" />
+              </div>
+              <h1 className="mt-5 text-xl font-bold text-ink-900">
+                Не удалось принять приглашение
+              </h1>
+              <p className="mt-2 text-sm text-ink-700">{inviteError}</p>
+              <button
+                onClick={() => setStep("welcome")}
+                className="btn-brand mt-5 w-full justify-center"
+              >
+                Создать свою компанию вместо этого
+              </button>
+            </div>
+          )}
 
           {step === "welcome" && (
             <div className="rounded-2xl border border-panel-border bg-panel p-8 shadow-soft">
@@ -311,6 +358,19 @@ export default function Onboarding() {
       </main>
     </div>
   );
+}
+
+function translateInviteError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes("expired"))
+    return "Срок приглашения истёк. Попросите владельца сгенерировать новую ссылку.";
+  if (m.includes("already used"))
+    return "Приглашение уже было использовано. Если это были вы — просто зайдите в Tigim. Иначе попросите новую ссылку.";
+  if (m.includes("not found"))
+    return "Ссылка некорректна или была отозвана. Попросите владельца сгенерировать новую.";
+  if (m.includes("not authenticated"))
+    return "Сессия истекла. Зайдите снова и переоткройте ссылку.";
+  return msg;
 }
 
 function ProgressBar({ step }: { step: Step }) {
