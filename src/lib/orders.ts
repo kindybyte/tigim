@@ -33,6 +33,7 @@ interface SizeRow {
 }
 
 interface StageRow {
+  id: string;
   name: StageName;
   status: StageStatus;
   position: number;
@@ -52,9 +53,11 @@ function num(n: number | string | null | undefined): number {
 
 function mapStage(s: StageRow, responsibleName?: string): Stage {
   return {
+    id: s.id,
     name: s.name,
     status: s.status,
     responsible: responsibleName ?? "—",
+    responsibleId: s.responsible_id ?? undefined,
     startedAt: s.started_at ?? undefined,
     finishedAt: s.finished_at ?? undefined,
     progress: s.progress,
@@ -78,6 +81,7 @@ function mapOrder(
 
   return {
     id: row.number, // we use number as display id (#1045)
+    uuid: row.id,   // DB primary key — нужен для work_logs.order_id
     client: row.client,
     clientPhone: row.client_phone ?? "",
     product: row.product,

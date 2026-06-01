@@ -196,41 +196,46 @@ export async function getFinanceData(companyId: string): Promise<{
 // ---------- Employee productivity ----------
 
 /**
- * Per-employee monthDone (sum qty of orders they were responsible for,
- * this month) and defectsPct (their defects / their qty * 100).
+ * Per-employee monthDone (sum qty from work_logs за текущий месяц) и
+ * defectsPct (брак сотрудника / его выработка * 100).
+ *
+ * До добавления work_logs (миграция 0009) monthDone был эвристикой — qty
+ * заказов где сотрудник стоял "ответственным". Теперь это честная сумма
+ * фактической выработки, которая идёт прямо в сдельную оплату.
  */
 export async function getEmployeeProductivity(
   companyId: string,
 ): Promise<Map<string, EmployeeProductivity>> {
   const supabase = getSupabase();
 
-  const monthStart = startOfMonth(new Date()).toISOString();
+  const monthStartIso = startOfMonth(new Date()).toISOString();
+  const monthStartDate = monthStartIso.slice(0, 10);
 
-  const [{ data: orders }, { data: defects }] = await Promise.all([
+  const [{ data: logs }, { data: defects }] = await Promise.all([
     supabase
-      .from("orders")
-      .select("qty, responsible_id, created_at")
+      .from("work_logs")
+      .select("qty, employee_id, date")
       .eq("company_id", companyId)
-      .gte("created_at", monthStart),
+      .gte("date", monthStartDate),
     supabase
       .from("defects")
       .select("qty, employee_id, date")
       .eq("company_id", companyId)
-      .gte("date", monthStart.slice(0, 10)),
+      .gte("date", monthStartDate),
   ]);
 
   const map = new Map<string, EmployeeProductivity>();
 
-  (orders ?? []).forEach((o) => {
-    if (!o.responsible_id) return;
-    const existing = map.get(o.responsible_id) ?? {
-      employeeId: o.responsible_id,
+  (logs ?? []).forEach((l) => {
+    if (!l.employee_id) return;
+    const existing = map.get(l.employee_id) ?? {
+      employeeId: l.employee_id,
       monthDone: 0,
       defectsQty: 0,
       defectsPct: 0,
     };
-    existing.monthDone += o.qty;
-    map.set(o.responsible_id, existing);
+    existing.monthDone += l.qty;
+    map.set(l.employee_id, existing);
   });
 
   (defects ?? []).forEach((d) => {
@@ -245,7 +250,6 @@ export async function getEmployeeProductivity(
     map.set(d.employee_id, existing);
   });
 
-  // Compute pct
   for (const v of map.values()) {
     v.defectsPct = v.monthDone > 0 ? Math.round((v.defectsQty / v.monthDone) * 1000) / 10 : 0;
   }

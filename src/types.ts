@@ -27,9 +27,11 @@ export interface SizeBreakdown {
 }
 
 export interface Stage {
+  id?: string; // DB uuid — отсутствует у моков, есть у реальных данных
   name: StageName;
   status: StageStatus;
   responsible: string;
+  responsibleId?: string;
   startedAt?: string;
   finishedAt?: string;
   progress: number; // 0..100
@@ -37,7 +39,8 @@ export interface Stage {
 }
 
 export interface Order {
-  id: string; // "1045"
+  id: string; // "1045" (display number)
+  uuid?: string; // DB primary key — отсутствует у моков, есть у реальных данных
   client: string;
   clientPhone: string;
   product: string;

@@ -1,16 +1,18 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
-  Circle,
+  ClipboardList,
   Download,
   ImageIcon,
   Loader2,
   MessageCircle,
   Phone,
+  Plus,
   Printer,
   AlertTriangle,
+  Trash2,
   User,
 } from "lucide-react";
 
@@ -19,6 +21,7 @@ import Card from "../components/ui/Card";
 import { OrderStatusBadge, StageStatusBadge } from "../components/ui/Badge";
 import ProgressBar from "../components/ui/ProgressBar";
 import Avatar from "../components/ui/Avatar";
+import WorkLogFormModal from "../components/WorkLogFormModal";
 import {
   daysUntil,
   defects as mockDefects,
@@ -27,9 +30,15 @@ import {
   formatSom,
   orders as mockOrders,
 } from "../data/mockData";
-import type { Order } from "../types";
+import type { Order, Stage } from "../types";
 import { useAuth } from "../lib/auth";
-import { getOrderByNumber } from "../lib/orders";
+import { getOrderByNumber, subscribeToOrders } from "../lib/orders";
+import {
+  deleteWorkLog,
+  listWorkLogsForOrder,
+  subscribeToWorkLogs,
+  type WorkLog,
+} from "../lib/workLogs";
 
 export default function OrderDetails() {
   const { id } = useParams<{ id: string }>();
@@ -41,27 +50,42 @@ export default function OrderDetails() {
   );
   const [loading, setLoading] = useState(useRealData);
   const [error, setError] = useState<string | null>(null);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [logModalOpen, setLogModalOpen] = useState(false);
+  const [logModalStageId, setLogModalStageId] = useState<string | undefined>(undefined);
+
+  const refetch = useCallback(async () => {
+    if (!useRealData || !id) return;
+    try {
+      const row = await getOrderByNumber(companyId!, id);
+      setOrder(row);
+      setError(null);
+      if (row?.uuid) {
+        const logs = await listWorkLogsForOrder(row.uuid);
+        setWorkLogs(logs);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось загрузить заказ");
+    } finally {
+      setLoading(false);
+    }
+  }, [useRealData, companyId, id]);
 
   useEffect(() => {
-    if (!useRealData || !id) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    getOrderByNumber(companyId!, id)
-      .then((row) => {
-        if (cancelled) return;
-        setOrder(row);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Не удалось загрузить заказ");
-        setLoading(false);
-      });
+    if (useRealData) setLoading(true);
+    void refetch();
+  }, [refetch, useRealData]);
+
+  // Realtime: подхватываем чужие записи выработки и изменения заказа.
+  useEffect(() => {
+    if (!useRealData || !companyId || !order?.uuid) return;
+    const unsubLogs = subscribeToWorkLogs(order.uuid, () => void refetch());
+    const unsubOrders = subscribeToOrders(companyId, () => void refetch());
     return () => {
-      cancelled = true;
+      unsubLogs();
+      unsubOrders();
     };
-  }, [useRealData, companyId, id]);
+  }, [useRealData, companyId, order?.uuid, refetch]);
 
   if (loading) {
     return (
@@ -91,6 +115,23 @@ export default function OrderDetails() {
 
   const dleft = daysUntil(order.deadline);
   const orderDefects = useRealData ? [] : mockDefects.filter((d) => d.orderId === order.id);
+  const canLogWork = useRealData && !!order.uuid;
+  const stagesWithId = order.stages.filter((s): s is Stage & { id: string } => Boolean(s.id));
+
+  function openLogModal(stageId?: string) {
+    setLogModalStageId(stageId);
+    setLogModalOpen(true);
+  }
+
+  async function handleDeleteLog(logId: string) {
+    if (!confirm("Удалить эту запись выработки?")) return;
+    try {
+      await deleteWorkLog(logId);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось удалить");
+    }
+  }
 
   const costSum =
     order.costBreakdown.fabric +
@@ -116,7 +157,15 @@ export default function OrderDetails() {
           <>
             <button className="btn-secondary"><Printer className="h-4 w-4" /> Печать</button>
             <button className="btn-secondary"><Download className="h-4 w-4" /> Скачать</button>
-            <button className="btn-brand"><CheckCircle2 className="h-4 w-4" /> Сменить статус</button>
+            <button
+              type="button"
+              onClick={() => openLogModal()}
+              disabled={!canLogWork}
+              title={canLogWork ? undefined : "Запись выработки доступна для реальных данных"}
+              className="btn-brand"
+            >
+              <ClipboardList className="h-4 w-4" /> Записать выработку
+            </button>
           </>
         }
       />
@@ -166,8 +215,11 @@ export default function OrderDetails() {
                 const done = stage.status === "Завершено";
                 const active = stage.status === "В работе";
                 const problem = stage.status === "Проблема";
+                const stageLogs = stage.id
+                  ? workLogs.filter((wl) => wl.stageId === stage.id)
+                  : [];
                 return (
-                  <li key={stage.name} className="flex gap-4">
+                  <li key={stage.id ?? stage.name} className="flex gap-4">
                     <div className="flex flex-col items-center">
                       <span
                         className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${
@@ -209,6 +261,31 @@ export default function OrderDetails() {
                         <p className="mt-2 rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200">
                           ⚠ {stage.comment}
                         </p>
+                      )}
+
+                      {/* Work logs timeline + per-stage record button */}
+                      {canLogWork && stage.id && (
+                        <div className="mt-3 space-y-1.5">
+                          {stageLogs.slice(0, 8).map((log) => (
+                            <WorkLogRow
+                              key={log.id}
+                              log={log}
+                              onDelete={() => void handleDeleteLog(log.id)}
+                            />
+                          ))}
+                          {stageLogs.length > 8 && (
+                            <p className="text-[11px] text-ink-600">
+                              … и ещё {stageLogs.length - 8} запис{stageLogs.length - 8 === 1 ? "ь" : "ей"}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => openLogModal(stage.id)}
+                            className="inline-flex items-center gap-1 rounded-md bg-brand-500/15 px-2 py-1 text-[11px] font-semibold text-brand-200 hover:bg-brand-500/25"
+                          >
+                            <Plus className="h-3 w-3" /> Записать выработку
+                          </button>
+                        </div>
                       )}
                     </div>
                   </li>
@@ -377,6 +454,23 @@ export default function OrderDetails() {
           </Card>
         </div>
       </div>
+
+      {canLogWork && order.uuid && (
+        <WorkLogFormModal
+          open={logModalOpen}
+          onClose={() => setLogModalOpen(false)}
+          onCreated={() => {
+            setLogModalOpen(false);
+            void refetch();
+          }}
+          companyId={companyId!}
+          orderId={order.uuid}
+          orderNumber={order.id}
+          stages={stagesWithId}
+          sizes={order.sizes}
+          defaultStageId={logModalStageId}
+        />
+      )}
     </div>
   );
 }
@@ -388,4 +482,46 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
       <dd className="text-right text-ink-800">{value}</dd>
     </div>
   );
+}
+
+function WorkLogRow({ log, onDelete }: { log: WorkLog; onDelete: () => void }) {
+  const when = useMemo(() => relativeDate(log.date), [log.date]);
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-panel-muted/50 px-2 py-1.5 text-xs">
+      <Avatar name={log.employeeName} color={log.employeeColor} size="xs" />
+      <span className="font-semibold text-ink-800">{log.employeeName}</span>
+      <span className="text-ink-600">·</span>
+      <span className="text-ink-600">{when}</span>
+      <span className="text-ink-600">·</span>
+      <span className="font-semibold text-ink-900 tabular-nums">+{log.qty} шт</span>
+      {log.size && (
+        <span className="rounded bg-panel px-1.5 py-0.5 text-[10px] font-semibold text-ink-700">
+          {log.size}
+        </span>
+      )}
+      {log.comment && (
+        <span className="truncate text-ink-600" title={log.comment}>
+          · {log.comment}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label="Удалить запись"
+        className="ml-auto rounded p-1 text-ink-600 hover:bg-rose-500/15 hover:text-rose-300"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+function relativeDate(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const diffDays = Math.round((today.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return "сегодня";
+  if (diffDays === 1) return "вчера";
+  if (diffDays < 7) return `${diffDays} дн. назад`;
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
 }

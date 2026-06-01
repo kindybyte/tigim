@@ -13,6 +13,7 @@ import { employees as mockEmployees, formatSom } from "../data/mockData";
 import type { Employee } from "../types";
 import { useAuth } from "../lib/auth";
 import { listEmployees } from "../lib/employees";
+import { getEmployeeProductivity } from "../lib/finance";
 
 export default function Employees() {
   const { configured, companyId } = useAuth();
@@ -29,8 +30,19 @@ export default function Employees() {
     setLoading(true);
     setFetchError(null);
     try {
-      const rows = await listEmployees(companyId!);
-      setEmployees(rows);
+      const [rows, productivity] = await Promise.all([
+        listEmployees(companyId!),
+        getEmployeeProductivity(companyId!),
+      ]);
+      const enriched = rows.map((e) => {
+        const p = productivity.get(e.id);
+        return {
+          ...e,
+          monthDone: p?.monthDone ?? 0,
+          defectsPct: p?.defectsPct ?? 0,
+        };
+      });
+      setEmployees(enriched);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Не удалось загрузить сотрудников");
     } finally {
