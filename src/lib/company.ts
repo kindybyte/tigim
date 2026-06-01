@@ -46,6 +46,42 @@ export interface UpdateCompanyInput {
   usdRate?: number;
 }
 
+// Все «видимые» в UI системные роли (master намеренно скрыт — см. roadmap).
+// Совпадает по значению с DB enum public.company_role.
+export type VisibleRole = "owner" | "manager" | "warehouse" | "qc" | "staff";
+
+export type RoleCounts = Record<VisibleRole, number> & { master?: number };
+
+/**
+ * Сколько у компании членов с каждой ролью. master сохраняется отдельно —
+ * UI его не показывает, но если кто-то унаследован с этой ролью, важно
+ * знать что он есть.
+ */
+export async function getRoleCounts(companyId: string): Promise<RoleCounts> {
+  const { data, error } = await getSupabase()
+    .from("company_members")
+    .select("role")
+    .eq("company_id", companyId);
+  if (error) throw new Error(error.message);
+
+  const counts: RoleCounts = {
+    owner: 0,
+    manager: 0,
+    warehouse: 0,
+    qc: 0,
+    staff: 0,
+  };
+  (data ?? []).forEach((row) => {
+    const r = row.role as VisibleRole | "master";
+    if (r in counts) {
+      counts[r as VisibleRole] = (counts[r as VisibleRole] ?? 0) + 1;
+    } else if (r === "master") {
+      counts.master = (counts.master ?? 0) + 1;
+    }
+  });
+  return counts;
+}
+
 export async function updateCompany(
   companyId: string,
   patch: UpdateCompanyInput,

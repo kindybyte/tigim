@@ -1,13 +1,21 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   Bell,
+  Boxes,
+  Briefcase,
   Building2,
+  Check,
+  Crown,
+  Eye,
   Loader2,
   Plug,
   Save,
   Shield,
+  ShieldCheck,
+  User,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
@@ -15,7 +23,7 @@ import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
 import { company as mockCompany, employees } from "../data/mockData";
 import { useAuth } from "../lib/auth";
-import { updateCompany } from "../lib/company";
+import { getRoleCounts, updateCompany, type VisibleRole } from "../lib/company";
 
 const TABS = [
   { key: "company", label: "Компания", icon: Building2 },
@@ -27,13 +35,94 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const ROLES = [
-  { name: "Владелец", desc: "Полный доступ ко всему" },
-  { name: "Менеджер", desc: "Заказы, клиенты, отчёты" },
-  { name: "Мастер цеха", desc: "Производство, сотрудники, брак" },
-  { name: "Склад", desc: "Материалы и движения" },
-  { name: "ОТК", desc: "Этап ОТК, фиксация брака" },
-  { name: "Сотрудник", desc: "Только свои задачи" },
+// Русское склонение «человек / человека / людей» для счётчика 0..n.
+function pluralPeople(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "человек";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "человека";
+  return "человек";
+}
+
+// Системные роли в UI (master намеренно скрыт). Совпадает по `code`
+// с public.company_role в БД, кроме master.
+interface SystemRole {
+  code: VisibleRole;
+  name: string;
+  desc: string;
+  icon: LucideIcon;
+  iconClass: string;
+  can: string[];
+  view: string[]; // только просмотр
+}
+
+const SYSTEM_ROLES: SystemRole[] = [
+  {
+    code: "owner",
+    name: "Владелец",
+    desc: "Полный доступ ко всему. Эту роль получает создатель компании.",
+    icon: Crown,
+    iconClass: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
+    can: [
+      "Управлять настройками компании и курсом валют",
+      "Приглашать пользователей и менять их роли",
+      "Заказы / склад / сотрудники / финансы — всё CRUD",
+      "Видеть и менять расходы по заказам",
+    ],
+    view: [],
+  },
+  {
+    code: "manager",
+    name: "Менеджер",
+    desc: "Операционное управление цехом: заказы, клиенты, склад, отчёты.",
+    icon: Briefcase,
+    iconClass: "bg-brand-500/15 text-brand-300 ring-brand-500/30",
+    can: [
+      "Создавать, редактировать и удалять заказы",
+      "Добавлять, изменять и увольнять сотрудников",
+      "Материалы и движения склада",
+      "Фиксировать и удалять брак",
+      "Расходы по заказу: добавлять и удалять",
+      "Записывать выработку",
+    ],
+    view: ["Финансы и отчёты"],
+  },
+  {
+    code: "warehouse",
+    name: "Склад",
+    desc: "Материалы и движения. Не лезет в заказы и финансы.",
+    icon: Boxes,
+    iconClass: "bg-teal-500/15 text-teal-300 ring-teal-500/30",
+    can: [
+      "Добавлять и редактировать материалы",
+      "Приход / расход / списание материалов",
+      "Списывать материалы на заказ (это создаёт расход в заказе)",
+    ],
+    view: ["Заказы", "Брак"],
+  },
+  {
+    code: "qc",
+    name: "ОТК",
+    desc: "Контроль качества. Этап ОТК и брак.",
+    icon: ShieldCheck,
+    iconClass: "bg-violet-500/15 text-violet-300 ring-violet-500/30",
+    can: [
+      "Переводить заказы на/с этапа ОТК",
+      "Менять прогресс этапов",
+      "Фиксировать и редактировать брак",
+      "Записывать выработку",
+    ],
+    view: ["Заказы", "Склад", "Сотрудники"],
+  },
+  {
+    code: "staff",
+    name: "Сотрудник",
+    desc: "Только просмотр данных компании. Базовая роль по умолчанию.",
+    icon: User,
+    iconClass: "bg-slate-500/15 text-slate-300 ring-slate-500/30",
+    can: [],
+    view: ["Заказы", "Склад", "Сотрудники", "Финансы (если разрешено)"],
+  },
 ];
 
 const INTEGRATIONS = [
@@ -49,6 +138,27 @@ export default function Settings() {
   const [tab, setTab] = useState<TabKey>("company");
   const { configured, companyId, company, refreshCompany } = useAuth();
   const isReal = configured && !!companyId && !!company;
+
+  // --- Роли: счётчики пользователей ---
+  const [roleCounts, setRoleCounts] = useState<Partial<Record<VisibleRole | "master", number>>>({});
+  const [rolesLoading, setRolesLoading] = useState(false);
+
+  const fetchRoleCounts = useCallback(async () => {
+    if (!isReal || !companyId) return;
+    setRolesLoading(true);
+    try {
+      const counts = await getRoleCounts(companyId);
+      setRoleCounts(counts);
+    } catch (err) {
+      console.warn("[settings] role counts failed:", err);
+    } finally {
+      setRolesLoading(false);
+    }
+  }, [isReal, companyId]);
+
+  useEffect(() => {
+    if (tab === "roles") void fetchRoleCounts();
+  }, [tab, fetchRoleCounts]);
 
   // Локальное состояние формы (синхронизируется с context при загрузке)
   const [name, setName] = useState("");
@@ -224,18 +334,74 @@ export default function Settings() {
           )}
 
           {tab === "roles" && (
-            <Card title="Роли" subtitle="Управление правами доступа">
+            <Card
+              title="Роли"
+              subtitle="Что может делать каждый тип сотрудника. Назначение ролей — во вкладке «Пользователи»."
+            >
+              {!isReal && (
+                <p className="mb-4 rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
+                  Демо-режим: счётчики пользователей показываются как «—».
+                </p>
+              )}
+
               <ul className="grid gap-3 sm:grid-cols-2">
-                {ROLES.map((r) => (
-                  <li key={r.name} className="rounded-xl border border-panel-border bg-panel-muted/40 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-ink-900">{r.name}</p>
-                      <button className="text-xs font-semibold text-brand-300 hover:text-brand-200">Настроить</button>
-                    </div>
-                    <p className="mt-1 text-xs text-ink-600">{r.desc}</p>
-                  </li>
-                ))}
+                {SYSTEM_ROLES.map((role) => {
+                  const Icon = role.icon;
+                  const count = roleCounts[role.code];
+                  return (
+                    <li
+                      key={role.code}
+                      className="rounded-xl border border-panel-border bg-panel-muted/40 p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span
+                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ring-1 ${role.iconClass}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold text-ink-900">{role.name}</p>
+                            <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[11px] font-bold tabular-nums text-ink-700">
+                              {!isReal
+                                ? "—"
+                                : rolesLoading
+                                  ? "…"
+                                  : `${count ?? 0} ${pluralPeople(count ?? 0)}`}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-ink-600">{role.desc}</p>
+                        </div>
+                      </div>
+
+                      {(role.can.length > 0 || role.view.length > 0) && (
+                        <div className="mt-3 space-y-1.5 border-t border-panel-border pt-3 text-xs">
+                          {role.can.map((c) => (
+                            <p key={c} className="flex items-start gap-2 text-ink-800">
+                              <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />
+                              <span>{c}</span>
+                            </p>
+                          ))}
+                          {role.view.map((v) => (
+                            <p key={v} className="flex items-start gap-2 text-ink-600">
+                              <Eye className="mt-0.5 h-3 w-3 shrink-0" />
+                              <span>{v} — только просмотр</span>
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
+
+              {/* Если в БД кто-то унаследован с ролью master — покажем тонкую плашку */}
+              {isReal && (roleCounts.master ?? 0) > 0 && (
+                <p className="mt-4 rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
+                  В БД есть {roleCounts.master} пользовател{(roleCounts.master ?? 0) === 1 ? "ь" : "и"} с устаревшей ролью «Мастер цеха».
+                  Откройте вкладку «Пользователи» чтобы переназначить их на «Менеджер» или «ОТК».
+                </p>
+              )}
             </Card>
           )}
 
