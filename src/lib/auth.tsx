@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "./supabase";
+import type { Company } from "../types";
 
 interface AuthContextValue {
   user: User | null;
@@ -8,6 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   configured: boolean;
   companyId: string | null;
+  company: Company | null;
   companyLoading: boolean;
   refreshCompany: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
@@ -28,37 +30,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [companyLoading, setCompanyLoading] = useState(false);
 
   const fetchCompany = useCallback(async (uid: string | undefined) => {
     if (!uid || !supabaseConfigured) {
       setCompanyId(null);
+      setCompany(null);
       setCompanyLoading(false);
       return;
     }
     setCompanyLoading(true);
     try {
+      // Один запрос с join: company_members.company_id → companies(*)
       const queryPromise: Promise<{
-        data: { company_id: string } | null;
+        data: {
+          company_id: string;
+          companies: {
+            id: string;
+            name: string;
+            phone: string | null;
+            address: string | null;
+            plan: Company["plan"];
+            usd_rate: number | string;
+            trial_ends_at: string | null;
+          } | null;
+        } | null;
         error: { message: string } | null;
       }> = Promise.resolve(
         getSupabase()
           .from("company_members")
-          .select("company_id")
+          .select(
+            "company_id, companies(id, name, phone, address, plan, usd_rate, trial_ends_at)",
+          )
           .eq("user_id", uid)
           .limit(1)
-          .maybeSingle(),
+          .maybeSingle() as unknown as Promise<{
+          data: {
+            company_id: string;
+            companies: {
+              id: string;
+              name: string;
+              phone: string | null;
+              address: string | null;
+              plan: Company["plan"];
+              usd_rate: number | string;
+              trial_ends_at: string | null;
+            } | null;
+          } | null;
+          error: { message: string } | null;
+        }>,
       );
       const result = await withTimeout(queryPromise, 10000);
       if (result.error) {
         console.warn("[auth] fetch company failed:", result.error.message);
         setCompanyId(null);
+        setCompany(null);
       } else {
         setCompanyId(result.data?.company_id ?? null);
+        const c = result.data?.companies ?? null;
+        setCompany(
+          c
+            ? {
+                id: c.id,
+                name: c.name,
+                phone: c.phone,
+                address: c.address,
+                plan: c.plan,
+                usdRate:
+                  typeof c.usd_rate === "string"
+                    ? parseFloat(c.usd_rate)
+                    : c.usd_rate ?? 88,
+                trialEndsAt: c.trial_ends_at,
+              }
+            : null,
+        );
       }
     } catch (e) {
       console.warn("[auth] fetch company timed out / failed:", e);
       setCompanyId(null);
+      setCompany(null);
     } finally {
       setCompanyLoading(false);
     }
@@ -91,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }, 0);
       } else {
         setCompanyId(null);
+        setCompany(null);
         setCompanyLoading(false);
       }
     };
@@ -157,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabaseConfigured) return;
     await getSupabase().auth.signOut();
     setCompanyId(null);
+    setCompany(null);
   };
 
   const resetPassword: AuthContextValue["resetPassword"] = async (email) => {
@@ -181,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         configured: supabaseConfigured,
         companyId,
+        company,
         companyLoading,
         refreshCompany,
         signIn,

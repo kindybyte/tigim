@@ -1,5 +1,5 @@
 import { getSupabase } from "./supabase";
-import type { Material, MaterialType, MaterialUnit } from "../types";
+import type { Currency, Material, MaterialType, MaterialUnit } from "../types";
 
 // ---------- DB row shape ----------
 
@@ -13,6 +13,7 @@ interface MaterialRow {
   stock: number | string;
   min_stock: number | string;
   price_per_unit: number | string;
+  price_currency: Currency | null;
   supplier: string | null;
 }
 
@@ -32,6 +33,7 @@ function mapMaterial(row: MaterialRow): Material {
     minStock: num(row.min_stock),
     supplier: row.supplier ?? "",
     pricePerUnit: num(row.price_per_unit),
+    priceCurrency: row.price_currency ?? "KGS",
   };
 }
 
@@ -57,6 +59,7 @@ export interface NewMaterialInput {
   stock?: number;
   minStock?: number;
   pricePerUnit?: number;
+  priceCurrency?: Currency;
   supplier?: string;
 }
 
@@ -75,6 +78,7 @@ export async function createMaterial(
       stock: input.stock ?? 0,
       min_stock: input.minStock ?? 0,
       price_per_unit: input.pricePerUnit ?? 0,
+      price_currency: input.priceCurrency ?? "KGS",
       supplier: input.supplier || null,
     })
     .select("id")
@@ -94,6 +98,7 @@ export async function updateMaterial(
   if (patch.unit !== undefined) updates.unit = patch.unit;
   if (patch.minStock !== undefined) updates.min_stock = patch.minStock;
   if (patch.pricePerUnit !== undefined) updates.price_per_unit = patch.pricePerUnit;
+  if (patch.priceCurrency !== undefined) updates.price_currency = patch.priceCurrency;
   if (patch.supplier !== undefined) updates.supplier = patch.supplier || null;
   // Note: stock не редактируем напрямую — только через recordMovement.
 

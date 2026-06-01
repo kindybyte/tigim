@@ -102,6 +102,8 @@ export interface OrderCostBreakdown {
 export type MaterialType = "ткань" | "фурнитура" | "упаковка" | "нить";
 export type MaterialUnit = "кг" | "м" | "шт" | "рул";
 
+export type Currency = "KGS" | "USD";
+
 export interface Material {
   id: string;
   name: string;
@@ -111,7 +113,18 @@ export interface Material {
   unit: MaterialUnit;
   minStock: number;
   supplier: string;
-  pricePerUnit: number;
+  pricePerUnit: number;          // в исходной валюте (priceCurrency)
+  priceCurrency: Currency;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string | null;
+  plan: "trial" | "start" | "pro" | "factory";
+  usdRate: number;               // курс USD→KGS, дефолт 88
+  trialEndsAt: string | null;
 }
 
 export interface Defect {

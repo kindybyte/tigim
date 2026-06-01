@@ -27,8 +27,9 @@ import { listMaterials, subscribeToMaterials, type MovementKind } from "../lib/w
 const TYPES: MaterialType[] = ["ткань", "фурнитура", "упаковка", "нить"];
 
 export default function Warehouse() {
-  const { configured, companyId } = useAuth();
+  const { configured, companyId, company } = useAuth();
   const useRealData = configured && !!companyId;
+  const usdRate = company?.usdRate ?? 88;
 
   const [materials, setMaterials] = useState<Material[]>(useRealData ? [] : mockMaterials);
   const [loading, setLoading] = useState(useRealData);
@@ -84,7 +85,11 @@ export default function Warehouse() {
   }, [materials, query, typeFilter]);
 
   const lowCount = materials.filter((m) => m.stock < m.minStock).length;
-  const totalValue = materials.reduce((s, m) => s + m.stock * m.pricePerUnit, 0);
+  // Стоимость склада: USD-цены конвертируем по текущему курсу компании.
+  const totalValue = materials.reduce((s, m) => {
+    const kgsPrice = m.priceCurrency === "USD" ? m.pricePerUnit * usdRate : m.pricePerUnit;
+    return s + m.stock * kgsPrice;
+  }, 0);
 
   function openMovement(kind: MovementKind, materialId?: string) {
     setMovement({ open: true, kind, materialId });
@@ -237,7 +242,20 @@ export default function Warehouse() {
                           <Badge tone="success" dot>В норме</Badge>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-right align-middle tabular-nums">{formatNumber(m.pricePerUnit)} сом</td>
+                      <td className="px-3 py-3 text-right align-middle tabular-nums">
+                        {m.priceCurrency === "USD" ? (
+                          <div className="flex flex-col items-end leading-tight">
+                            <span className="font-semibold text-ink-900">
+                              ${formatNumber(m.pricePerUnit)}
+                            </span>
+                            <span className="text-[11px] text-ink-600">
+                              ≈ {formatNumber(m.pricePerUnit * usdRate)} сом
+                            </span>
+                          </div>
+                        ) : (
+                          <span>{formatNumber(m.pricePerUnit)} сом</span>
+                        )}
+                      </td>
                       <td className="px-3 py-3 align-middle text-right">
                         <div className="inline-flex gap-1">
                           <button

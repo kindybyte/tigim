@@ -330,16 +330,16 @@ export const orders: Order[] = [
 ];
 
 export const materials: Material[] = [
-  { id: "m1", name: "Холодок 180", type: "ткань", color: "Чёрный", stock: 120, unit: "кг", minStock: 80, supplier: 'ОсОО "Текстиль-Импорт"', pricePerUnit: 580 },
-  { id: "m2", name: "Джакард", type: "ткань", color: "Белый", stock: 85, unit: "кг", minStock: 50, supplier: 'ОсОО "Текстиль-Импорт"', pricePerUnit: 720 },
-  { id: "m3", name: "Рибана", type: "ткань", color: "Серый меланж", stock: 40, unit: "кг", minStock: 60, supplier: 'Бишкек-Текстиль', pricePerUnit: 640 },
-  { id: "m4", name: "Молния спираль 50 см", type: "фурнитура", color: "Чёрный", stock: 500, unit: "шт", minStock: 200, supplier: 'YKK Партнёр', pricePerUnit: 22 },
-  { id: "m5", name: "Пакеты упаковочные", type: "упаковка", color: "Прозрачный", stock: 2000, unit: "шт", minStock: 500, supplier: 'PackKG', pricePerUnit: 4 },
-  { id: "m6", name: "Габардин", type: "ткань", color: "Тёмно-синий", stock: 95, unit: "кг", minStock: 70, supplier: 'Текстильный двор', pricePerUnit: 690 },
-  { id: "m7", name: "Нить швейная №40", type: "нить", color: "Белый", stock: 35, unit: "рул", minStock: 50, supplier: 'Алтын-Жип', pricePerUnit: 95 },
-  { id: "m8", name: "Футер 3-нитка с начёсом", type: "ткань", color: "Серый", stock: 18, unit: "кг", minStock: 40, supplier: 'Бишкек-Текстиль', pricePerUnit: 820 },
-  { id: "m9", name: "Резинка 30 мм", type: "фурнитура", color: "Чёрный", stock: 240, unit: "м", minStock: 100, supplier: 'Фурнитура+', pricePerUnit: 18 },
-  { id: "m10", name: "Этикетки тканевые", type: "фурнитура", color: "Белый", stock: 1500, unit: "шт", minStock: 800, supplier: 'LabelKG', pricePerUnit: 3 },
+  { id: "m1", name: "Холодок 180", type: "ткань", priceCurrency: "KGS", color: "Чёрный", stock: 120, unit: "кг", minStock: 80, supplier: 'ОсОО "Текстиль-Импорт"', pricePerUnit: 580 },
+  { id: "m2", name: "Джакард", type: "ткань", priceCurrency: "KGS", color: "Белый", stock: 85, unit: "кг", minStock: 50, supplier: 'ОсОО "Текстиль-Импорт"', pricePerUnit: 720 },
+  { id: "m3", name: "Рибана", type: "ткань", priceCurrency: "KGS", color: "Серый меланж", stock: 40, unit: "кг", minStock: 60, supplier: 'Бишкек-Текстиль', pricePerUnit: 640 },
+  { id: "m4", name: "Молния спираль 50 см", type: "фурнитура", priceCurrency: "KGS", color: "Чёрный", stock: 500, unit: "шт", minStock: 200, supplier: 'YKK Партнёр', pricePerUnit: 22 },
+  { id: "m5", name: "Пакеты упаковочные", type: "упаковка", priceCurrency: "KGS", color: "Прозрачный", stock: 2000, unit: "шт", minStock: 500, supplier: 'PackKG', pricePerUnit: 4 },
+  { id: "m6", name: "Габардин", type: "ткань", priceCurrency: "KGS", color: "Тёмно-синий", stock: 95, unit: "кг", minStock: 70, supplier: 'Текстильный двор', pricePerUnit: 690 },
+  { id: "m7", name: "Нить швейная №40", type: "нить", priceCurrency: "KGS", color: "Белый", stock: 35, unit: "рул", minStock: 50, supplier: 'Алтын-Жип', pricePerUnit: 95 },
+  { id: "m8", name: "Футер 3-нитка с начёсом", type: "ткань", priceCurrency: "KGS", color: "Серый", stock: 18, unit: "кг", minStock: 40, supplier: 'Бишкек-Текстиль', pricePerUnit: 820 },
+  { id: "m9", name: "Резинка 30 мм", type: "фурнитура", priceCurrency: "KGS", color: "Чёрный", stock: 240, unit: "м", minStock: 100, supplier: 'Фурнитура+', pricePerUnit: 18 },
+  { id: "m10", name: "Этикетки тканевые", type: "фурнитура", priceCurrency: "KGS", color: "Белый", stock: 1500, unit: "шт", minStock: 800, supplier: 'LabelKG', pricePerUnit: 3 },
 ];
 
 export const employees: Employee[] = [

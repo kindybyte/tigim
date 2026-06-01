@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import { createMaterial } from "../lib/warehouse";
-import type { MaterialType, MaterialUnit } from "../types";
+import { useAuth } from "../lib/auth";
+import type { Currency, MaterialType, MaterialUnit } from "../types";
 
 interface MaterialFormModalProps {
   open: boolean;
@@ -19,6 +20,9 @@ export default function MaterialFormModal({
   onCreated,
   companyId,
 }: MaterialFormModalProps) {
+  const { company } = useAuth();
+  const usdRate = company?.usdRate ?? 88;
+
   const [name, setName] = useState("");
   const [type, setType] = useState<MaterialType>("ткань");
   const [color, setColor] = useState("");
@@ -26,6 +30,7 @@ export default function MaterialFormModal({
   const [stock, setStock] = useState("");
   const [minStock, setMinStock] = useState("");
   const [pricePerUnit, setPricePerUnit] = useState("");
+  const [priceCurrency, setPriceCurrency] = useState<Currency>("KGS");
   const [supplier, setSupplier] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +58,7 @@ export default function MaterialFormModal({
       setStock("");
       setMinStock("");
       setPricePerUnit("");
+      setPriceCurrency("KGS");
       setSupplier("");
       setError(null);
     }
@@ -73,6 +79,7 @@ export default function MaterialFormModal({
         stock: parseFloat(stock) || 0,
         minStock: parseFloat(minStock) || 0,
         pricePerUnit: parseFloat(pricePerUnit) || 0,
+        priceCurrency,
         supplier: supplier.trim() || undefined,
       });
       onCreated();
@@ -191,17 +198,50 @@ export default function MaterialFormModal({
               />
             </div>
             <div className="sm:col-span-2">
-              <label htmlFor="mat-price" className="label">Цена за единицу (сом)</label>
-              <input
-                id="mat-price"
-                type="number"
-                step="0.01"
-                min="0"
-                value={pricePerUnit}
-                onChange={(e) => setPricePerUnit(e.target.value)}
-                className="input mt-1.5"
-                placeholder="580"
-              />
+              <label className="label">Цена за единицу</label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="mat-price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={pricePerUnit}
+                  onChange={(e) => setPricePerUnit(e.target.value)}
+                  className="input flex-1"
+                  placeholder={priceCurrency === "USD" ? "5" : "580"}
+                  aria-label="Цена"
+                />
+                <div className="inline-flex rounded-lg border border-panel-border bg-panel-muted p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPriceCurrency("KGS")}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      priceCurrency === "KGS"
+                        ? "bg-brand-600 text-white shadow-sm"
+                        : "text-ink-700 hover:text-ink-900"
+                    }`}
+                  >
+                    сом
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriceCurrency("USD")}
+                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      priceCurrency === "USD"
+                        ? "bg-brand-600 text-white shadow-sm"
+                        : "text-ink-700 hover:text-ink-900"
+                    }`}
+                  >
+                    USD
+                  </button>
+                </div>
+              </div>
+              {priceCurrency === "USD" && pricePerUnit && (
+                <p className="mt-1.5 text-xs text-ink-600">
+                  ≈ {(parseFloat(pricePerUnit) * usdRate).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} сом
+                  <span className="text-ink-600/70"> · по курсу {usdRate.toFixed(2)} сом/$, настраивается в Настройках</span>
+                </p>
+              )}
             </div>
           </div>
 

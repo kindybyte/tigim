@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Bell,
   Building2,
+  Loader2,
   Plug,
   Save,
   Shield,
@@ -12,7 +13,9 @@ import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import Avatar from "../components/ui/Avatar";
 import Badge from "../components/ui/Badge";
-import { company, employees } from "../data/mockData";
+import { company as mockCompany, employees } from "../data/mockData";
+import { useAuth } from "../lib/auth";
+import { updateCompany } from "../lib/company";
 
 const TABS = [
   { key: "company", label: "Компания", icon: Building2 },
@@ -44,6 +47,53 @@ const INTEGRATIONS = [
 
 export default function Settings() {
   const [tab, setTab] = useState<TabKey>("company");
+  const { configured, companyId, company, refreshCompany } = useAuth();
+  const isReal = configured && !!companyId && !!company;
+
+  // Локальное состояние формы (синхронизируется с context при загрузке)
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [usdRate, setUsdRate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (company) {
+      setName(company.name);
+      setPhone(company.phone ?? "");
+      setAddress(company.address ?? "");
+      setUsdRate(String(company.usdRate));
+    } else if (!isReal) {
+      // Демо
+      setName(mockCompany.name);
+      setPhone(mockCompany.phone);
+      setAddress(mockCompany.address);
+      setUsdRate("88");
+    }
+  }, [company, isReal]);
+
+  async function handleCompanySave(e: FormEvent) {
+    e.preventDefault();
+    if (!isReal || !companyId) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateCompany(companyId, {
+        name: name.trim(),
+        phone: phone.trim() || null,
+        address: address.trim() || null,
+        usdRate: parseFloat(usdRate) || 88,
+      });
+      await refreshCompany();
+      setSavedAt(new Date());
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Не удалось сохранить");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="animate-fade-in">
@@ -69,41 +119,84 @@ export default function Settings() {
 
         <div>
           {tab === "company" && (
-            <Card title="Компания" subtitle="Основные данные вашего цеха">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">Название компании</label>
-                  <input className="input mt-1.5" defaultValue={company.name} />
+            <Card title="Компания" subtitle="Основные данные и курс валют">
+              <form onSubmit={handleCompanySave}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Название компании</label>
+                    <input
+                      className="input mt-1.5"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={!isReal}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Телефон</label>
+                    <input
+                      className="input mt-1.5"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      disabled={!isReal}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Адрес</label>
+                    <input
+                      className="input mt-1.5"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      disabled={!isReal}
+                    />
+                  </div>
+                  <div className="sm:col-span-2 rounded-xl border border-panel-border bg-panel-muted/40 p-4">
+                    <label className="label">Курс USD → KGS</label>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      Применяется ко всем материалам с ценой в долларах. Меняйте когда курс
+                      существенно сдвинулся — для уже списанных партий цифра не пересчитывается.
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-sm font-semibold text-ink-700">1 USD =</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={usdRate}
+                        onChange={(e) => setUsdRate(e.target.value)}
+                        className="input max-w-[140px] tabular-nums"
+                        disabled={!isReal}
+                      />
+                      <span className="text-sm font-semibold text-ink-700">сом</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="label">Телефон</label>
-                  <input className="input mt-1.5" defaultValue={company.phone} />
+
+                {saveError && (
+                  <p className="mt-3 rounded-lg bg-rose-500/15 px-3 py-2 text-xs text-rose-300 ring-1 ring-rose-500/30">
+                    {saveError}
+                  </p>
+                )}
+
+                <div className="mt-6 flex items-center justify-end gap-3">
+                  {savedAt && !saveError && (
+                    <span className="text-xs text-emerald-300">
+                      Сохранено в {savedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!isReal || saving}
+                    title={isReal ? undefined : "В демо-режиме сохранение недоступно"}
+                    className="btn-brand"
+                  >
+                    {saving ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Сохраняем…</>
+                    ) : (
+                      <><Save className="h-4 w-4" /> Сохранить</>
+                    )}
+                  </button>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="label">Адрес</label>
-                  <input className="input mt-1.5" defaultValue={company.address} />
-                </div>
-                <div>
-                  <label className="label">Валюта</label>
-                  <select className="input mt-1.5">
-                    <option>сом (KGS)</option>
-                    <option>тенге (KZT)</option>
-                    <option>рубль (RUB)</option>
-                    <option>доллар (USD)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label">Часовой пояс</label>
-                  <select className="input mt-1.5">
-                    <option>Бишкек (UTC+6)</option>
-                    <option>Алматы (UTC+5)</option>
-                    <option>Москва (UTC+3)</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mt-6 flex justify-end">
-                <button className="btn-brand"><Save className="h-4 w-4" /> Сохранить</button>
-              </div>
+              </form>
             </Card>
           )}
 
