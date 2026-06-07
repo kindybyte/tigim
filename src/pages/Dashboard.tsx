@@ -28,6 +28,7 @@ import {
   formatSom,
 } from "../data/mockData";
 import { useAuth } from "../lib/auth";
+import { canSeeFinance } from "../lib/company";
 import { getDashboardData, type DashboardData } from "../lib/dashboard";
 
 function greetingForHour(h: number): string {
@@ -81,7 +82,8 @@ const EMPTY: DashboardData = {
 };
 
 export default function Dashboard() {
-  const { user, configured, companyId } = useAuth();
+  const { user, configured, companyId, currentRole } = useAuth();
+  const showFinance = !configured || canSeeFinance(currentRole);
   const useRealData = configured && !!companyId;
 
   const firstName =
@@ -163,7 +165,9 @@ export default function Dashboard() {
             />
             <StatCard label="Готовые партии" value={String(data.readyCount)} icon={PackageCheck} iconTone="success" />
             <StatCard label="Брак за месяц" value={`${data.monthDefectsQty} шт`} icon={AlertTriangle} iconTone="warning" />
-            <StatCard label="Прибыль за месяц" value={formatSom(data.monthProfit)} icon={Wallet} iconTone="brand" />
+            {showFinance && (
+              <StatCard label="Прибыль за месяц" value={formatSom(data.monthProfit)} icon={Wallet} iconTone="brand" />
+            )}
           </div>
 
           {/* MAIN GRID */}
@@ -282,30 +286,32 @@ export default function Dashboard() {
           </div>
 
           {/* CHARTS */}
-          <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            <Card
-              className="lg:col-span-2"
-              title="Выручка по месяцам"
-              subtitle="Тысяч сом · последние 6 месяцев"
-              action={
-                hasAnyData ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
-                    <TrendingUp className="h-3 w-3" /> данные обновляются
-                  </span>
-                ) : undefined
-              }
-            >
-              {!hasAnyData ? (
-                <p className="py-12 text-center text-sm text-ink-600">
-                  График появится с первым заказом
-                </p>
-              ) : (
-                <LineChart
-                  data={data.monthlyRevenue}
-                  formatValue={(v) => `${v} тыс. сом`}
-                />
-              )}
-            </Card>
+          <div className={`mt-6 grid gap-4 ${showFinance ? "lg:grid-cols-3" : "lg:grid-cols-1"}`}>
+            {showFinance && (
+              <Card
+                className="lg:col-span-2"
+                title="Выручка по месяцам"
+                subtitle="Тысяч сом · последние 6 месяцев"
+                action={
+                  hasAnyData ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                      <TrendingUp className="h-3 w-3" /> данные обновляются
+                    </span>
+                  ) : undefined
+                }
+              >
+                {!hasAnyData ? (
+                  <p className="py-12 text-center text-sm text-ink-600">
+                    График появится с первым заказом
+                  </p>
+                ) : (
+                  <LineChart
+                    data={data.monthlyRevenue}
+                    formatValue={(v) => `${v} тыс. сом`}
+                  />
+                )}
+              </Card>
+            )}
 
             <Card title="Брак по неделям" subtitle="Последние 5 недель">
               {data.monthDefectsQty === 0 ? (

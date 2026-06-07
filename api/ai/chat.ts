@@ -100,10 +100,14 @@ export default async function handler(req: Request): Promise<Response> {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // ---- Company ----
+    // ---- Company + role check ----
+    // AI-помощник раскрывает финансы цеха (выручка, прибыль, расходы) в
+    // ответах. Технологу/Складу/ОТК/Сотруднику этого видеть нельзя.
+    // RLS не помогает — серверная функция работает под service_role.
+    // Проверяем роль явно.
     const memberRes = await supabase
       .from("company_members")
-      .select("company_id")
+      .select("company_id, role")
       .eq("user_id", userId)
       .limit(1)
       .maybeSingle();
@@ -111,6 +115,13 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ error: "Компания не найдена. Пройдите онбординг." }, 400);
     }
     const companyId = memberRes.data.company_id as string;
+    const role = memberRes.data.role as string;
+    if (role !== "owner" && role !== "manager") {
+      return json(
+        { error: "AI-помощник доступен только владельцам и менеджерам — он раскрывает финансовые данные компании." },
+        403,
+      );
+    }
 
     const companyRes = await supabase
       .from("companies")

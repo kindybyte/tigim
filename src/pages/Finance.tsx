@@ -15,6 +15,8 @@ import {
   revenueByMonth as mockRevenueByMonth,
 } from "../data/mockData";
 import { useAuth } from "../lib/auth";
+import { canSeeFinance } from "../lib/company";
+import NoAccess from "../components/ui/NoAccess";
 import {
   getFinanceData,
   type MonthPoint,
@@ -26,8 +28,13 @@ import { exportFinanceXlsx } from "../lib/exports";
 const DONUT_PALETTE = ["#3B82F6", "#22D3EE", "#A78BFA", "#F59E0B", "#F87171"];
 
 export default function Finance() {
-  const { configured, companyId } = useAuth();
+  const { configured, companyId, currentRole } = useAuth();
   const useRealData = configured && !!companyId;
+
+  // Технолог/Склад/ОТК/Сотрудник — финансы недоступны. В демо пускаем всех.
+  if (useRealData && !canSeeFinance(currentRole)) {
+    return <NoAccess />;
+  }
 
   const [loading, setLoading] = useState(useRealData);
   const [exporting, setExporting] = useState(false);

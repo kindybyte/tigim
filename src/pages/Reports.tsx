@@ -15,6 +15,8 @@ import {
 import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import { useAuth } from "../lib/auth";
+import { canSeeFinance } from "../lib/company";
+import NoAccess from "../components/ui/NoAccess";
 import {
   exportDefectsXlsx,
   exportEmployeesXlsx,
@@ -87,8 +89,12 @@ const toneMap: Record<ReportDef["tone"], string> = {
 };
 
 export default function Reports() {
-  const { configured, companyId } = useAuth();
+  const { configured, companyId, currentRole } = useAuth();
   const useRealData = configured && !!companyId;
+
+  if (useRealData && !canSeeFinance(currentRole)) {
+    return <NoAccess />;
+  }
 
   const [busy, setBusy] = useState<ReportKey | null>(null);
   const [error, setError] = useState<string | null>(null);

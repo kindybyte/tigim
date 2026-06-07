@@ -12,27 +12,44 @@ import {
   Settings,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Logo from "../ui/Logo";
+import { useAuth } from "../../lib/auth";
+import { canSeeFinance, canUseAi } from "../../lib/company";
 
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
 }
 
-const nav = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  end?: boolean;
+  badge?: string;
+  /** Если задан — пункт показывается только когда predicate(role) === true. */
+  visibleFor?: (role: ReturnType<typeof useAuth>["currentRole"]) => boolean;
+}
+
+const ALL_NAV: NavItem[] = [
   { to: "/app", label: "Дашборд", icon: LayoutDashboard, end: true },
   { to: "/app/orders", label: "Заказы", icon: ClipboardList },
   { to: "/app/production", label: "Производство", icon: Workflow },
   { to: "/app/warehouse", label: "Склад", icon: Boxes },
   { to: "/app/defects", label: "Брак", icon: AlertTriangle },
   { to: "/app/employees", label: "Сотрудники", icon: Users },
-  { to: "/app/finance", label: "Финансы", icon: Wallet },
-  { to: "/app/ai", label: "ИИ-помощник", icon: Sparkles, badge: "AI" },
-  { to: "/app/reports", label: "Отчёты", icon: FileBarChart },
+  { to: "/app/finance", label: "Финансы", icon: Wallet, visibleFor: canSeeFinance },
+  { to: "/app/ai", label: "ИИ-помощник", icon: Sparkles, badge: "AI", visibleFor: canUseAi },
+  { to: "/app/reports", label: "Отчёты", icon: FileBarChart, visibleFor: canSeeFinance },
   { to: "/app/settings", label: "Настройки", icon: Settings },
 ];
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
+  const { currentRole, configured } = useAuth();
+  // В демо-режиме (без Supabase) пунктов меню не урезаем — пусть владелец
+  // увидит всё на пустой компании.
+  const nav = ALL_NAV.filter((item) => !item.visibleFor || !configured || item.visibleFor(currentRole));
   return (
     <>
       {/* Mobile overlay */}

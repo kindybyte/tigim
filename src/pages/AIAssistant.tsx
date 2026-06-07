@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { AlertTriangle, Plus, Send, Sparkles } from "lucide-react";
 
 import Avatar from "../components/ui/Avatar";
+import NoAccess from "../components/ui/NoAccess";
 import { useAuth } from "../lib/auth";
+import { canUseAi } from "../lib/company";
 
 const QUICK_QUESTIONS = [
   "Какие заказы могут опоздать?",
@@ -35,8 +37,14 @@ function firstName(full: string | null | undefined): string {
 }
 
 export default function AIAssistant() {
-  const { user, session, configured, companyId } = useAuth();
+  const { user, session, configured, companyId, currentRole } = useAuth();
   const ready = configured && !!session && !!companyId;
+
+  // ИИ-помощник раскрывает в контексте выручку и финансы. Технологу и ниже
+  // не показываем. Заглушка для прямого захода по URL.
+  if (configured && !!companyId && !canUseAi(currentRole)) {
+    return <NoAccess message="ИИ-помощник использует финансовые данные компании, поэтому доступен только владельцам и менеджерам." />;
+  }
 
   const greeting = useMemo<Message>(() => {
     const name = firstName(user?.user_metadata?.full_name as string | undefined);

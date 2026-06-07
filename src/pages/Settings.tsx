@@ -18,6 +18,7 @@ import {
   User,
   UserPlus,
   Users,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -44,21 +45,22 @@ import {
   type Invitation,
 } from "../lib/invitations";
 
-const TABS = [
-  { key: "company", label: "Компания", icon: Building2 },
-  { key: "users", label: "Пользователи", icon: Users },
-  { key: "roles", label: "Роли", icon: Shield },
-  { key: "notifications", label: "Уведомления", icon: Bell },
-  { key: "integrations", label: "Интеграции", icon: Plug },
+const ALL_TABS = [
+  { key: "company", label: "Компания", icon: Building2, ownerOnly: true },
+  { key: "users", label: "Пользователи", icon: Users, ownerOnly: true },
+  { key: "roles", label: "Роли", icon: Shield, ownerOnly: true },
+  { key: "notifications", label: "Уведомления", icon: Bell, ownerOnly: false },
+  { key: "integrations", label: "Интеграции", icon: Plug, ownerOnly: false },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = (typeof ALL_TABS)[number]["key"];
 
 // Человекочитаемая подпись роли.
 function roleLabel(role: VisibleRole | "master"): string {
   switch (role) {
     case "owner": return "Владелец";
     case "manager": return "Менеджер";
+    case "technologist": return "Технолог";
     case "warehouse": return "Склад";
     case "qc": return "ОТК";
     case "staff": return "Сотрудник";
@@ -119,6 +121,22 @@ const SYSTEM_ROLES: SystemRole[] = [
     view: ["Финансы и отчёты"],
   },
   {
+    code: "technologist",
+    name: "Технолог",
+    desc: "Производственный лид: распределяет работу, ведёт сотрудников и склад. Не видит выручку и финансы.",
+    icon: Wrench,
+    iconClass: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
+    can: [
+      "Создавать и редактировать заказы (без видимости цен)",
+      "Добавлять и редактировать сотрудников, видеть зарплаты",
+      "Закупать материалы, делать движения склада",
+      "Записывать выработку и закрывать этапы",
+      "Фиксировать брак",
+      "Записывать расходы по заказу (купленные материалы)",
+    ],
+    view: ["Заказы (без цен)", "Брак"],
+  },
+  {
     code: "warehouse",
     name: "Склад",
     desc: "Материалы и движения. Не лезет в заказы и финансы.",
@@ -167,8 +185,18 @@ const INTEGRATIONS = [
 
 export default function Settings() {
   const [tab, setTab] = useState<TabKey>("company");
-  const { configured, companyId, company, refreshCompany, user } = useAuth();
+  const { configured, companyId, company, refreshCompany, user, currentRole } = useAuth();
   const isReal = configured && !!companyId && !!company;
+  // В демо-режиме показываем все вкладки (mock-данные). На реальной компании —
+  // фильтруем по роли: tabs.ownerOnly прячутся для всех кроме owner.
+  const TABS = ALL_TABS.filter((t) => !t.ownerOnly || !isReal || currentRole === "owner");
+
+  // Если активная вкладка стала недоступна — переключаем на первую видимую.
+  useEffect(() => {
+    if (!TABS.find((t) => t.key === tab)) {
+      setTab(TABS[0]?.key ?? "notifications");
+    }
+  }, [TABS, tab]);
 
   // --- Роли: счётчики пользователей ---
   const [roleCounts, setRoleCounts] = useState<Partial<Record<VisibleRole | "master", number>>>({});

@@ -48,9 +48,29 @@ export interface UpdateCompanyInput {
 
 // Все «видимые» в UI системные роли (master намеренно скрыт — см. roadmap).
 // Совпадает по значению с DB enum public.company_role.
-export type VisibleRole = "owner" | "manager" | "warehouse" | "qc" | "staff";
+export type VisibleRole = "owner" | "manager" | "technologist" | "warehouse" | "qc" | "staff";
+
+// Любая роль которая может прийти из БД (включая legacy master).
+export type AnyRole = VisibleRole | "master";
 
 export type RoleCounts = Record<VisibleRole, number> & { master?: number };
+
+// ---------- Permission helpers (UI-side gating, не security boundary) ----------
+
+/** Видит ли роль финансовые цифры: выручку, прибыль, маржу, расходы. */
+export function canSeeFinance(role: AnyRole | null): boolean {
+  return role === "owner" || role === "manager";
+}
+
+/** Может ли роль управлять командой и настройками компании. */
+export function canManageCompany(role: AnyRole | null): boolean {
+  return role === "owner";
+}
+
+/** Видит ли роль ИИ-помощника (он раскрывает финансы в ответах). */
+export function canUseAi(role: AnyRole | null): boolean {
+  return role === "owner" || role === "manager";
+}
 
 /**
  * Сколько у компании членов с каждой ролью. master сохраняется отдельно —
@@ -67,12 +87,13 @@ export async function getRoleCounts(companyId: string): Promise<RoleCounts> {
   const counts: RoleCounts = {
     owner: 0,
     manager: 0,
+    technologist: 0,
     warehouse: 0,
     qc: 0,
     staff: 0,
   };
   (data ?? []).forEach((row) => {
-    const r = row.role as VisibleRole | "master";
+    const r = row.role as AnyRole;
     if (r in counts) {
       counts[r as VisibleRole] = (counts[r as VisibleRole] ?? 0) + 1;
     } else if (r === "master") {

@@ -3,6 +3,8 @@ import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "./supabase";
 import type { Company } from "../types";
 
+type CompanyRoleDb = "owner" | "manager" | "warehouse" | "qc" | "staff" | "master" | "technologist";
+
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
@@ -10,6 +12,8 @@ interface AuthContextValue {
   configured: boolean;
   companyId: string | null;
   company: Company | null;
+  /** Роль текущего пользователя в текущей компании. null если данных нет. */
+  currentRole: CompanyRoleDb | null;
   companyLoading: boolean;
   refreshCompany: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
@@ -31,53 +35,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
+  const [currentRole, setCurrentRole] = useState<CompanyRoleDb | null>(null);
   const [companyLoading, setCompanyLoading] = useState(false);
 
   const fetchCompany = useCallback(async (uid: string | undefined) => {
     if (!uid || !supabaseConfigured) {
       setCompanyId(null);
       setCompany(null);
+      setCurrentRole(null);
       setCompanyLoading(false);
       return;
     }
     setCompanyLoading(true);
     try {
-      // Один запрос с join: company_members.company_id → companies(*)
-      const queryPromise: Promise<{
-        data: {
-          company_id: string;
-          companies: {
-            id: string;
-            name: string;
-            phone: string | null;
-            address: string | null;
-            plan: Company["plan"];
-            usd_rate: number | string;
-            trial_ends_at: string | null;
-          } | null;
+      type CompanyJoinRow = {
+        company_id: string;
+        role: CompanyRoleDb;
+        companies: {
+          id: string;
+          name: string;
+          phone: string | null;
+          address: string | null;
+          plan: Company["plan"];
+          usd_rate: number | string;
+          trial_ends_at: string | null;
         } | null;
+      };
+      const queryPromise: Promise<{
+        data: CompanyJoinRow | null;
         error: { message: string } | null;
       }> = Promise.resolve(
         getSupabase()
           .from("company_members")
           .select(
-            "company_id, companies(id, name, phone, address, plan, usd_rate, trial_ends_at)",
+            "company_id, role, companies(id, name, phone, address, plan, usd_rate, trial_ends_at)",
           )
           .eq("user_id", uid)
           .limit(1)
           .maybeSingle() as unknown as Promise<{
-          data: {
-            company_id: string;
-            companies: {
-              id: string;
-              name: string;
-              phone: string | null;
-              address: string | null;
-              plan: Company["plan"];
-              usd_rate: number | string;
-              trial_ends_at: string | null;
-            } | null;
-          } | null;
+          data: CompanyJoinRow | null;
           error: { message: string } | null;
         }>,
       );
@@ -86,8 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("[auth] fetch company failed:", result.error.message);
         setCompanyId(null);
         setCompany(null);
+        setCurrentRole(null);
       } else {
         setCompanyId(result.data?.company_id ?? null);
+        setCurrentRole(result.data?.role ?? null);
         const c = result.data?.companies ?? null;
         setCompany(
           c
@@ -110,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn("[auth] fetch company timed out / failed:", e);
       setCompanyId(null);
       setCompany(null);
+      setCurrentRole(null);
     } finally {
       setCompanyLoading(false);
     }
@@ -143,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setCompanyId(null);
         setCompany(null);
+        setCurrentRole(null);
         setCompanyLoading(false);
       }
     };
@@ -210,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await getSupabase().auth.signOut();
     setCompanyId(null);
     setCompany(null);
+    setCurrentRole(null);
   };
 
   const resetPassword: AuthContextValue["resetPassword"] = async (email) => {
@@ -235,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         configured: supabaseConfigured,
         companyId,
         company,
+        currentRole,
         companyLoading,
         refreshCompany,
         signIn,

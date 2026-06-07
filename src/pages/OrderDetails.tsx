@@ -35,6 +35,7 @@ import {
 } from "../data/mockData";
 import type { Order, OrderExpense, Stage } from "../types";
 import { useAuth } from "../lib/auth";
+import { canSeeFinance } from "../lib/company";
 import { getOrderByNumber, subscribeToOrders } from "../lib/orders";
 import {
   deleteWorkLog,
@@ -51,8 +52,9 @@ import {
 
 export default function OrderDetails() {
   const { id } = useParams<{ id: string }>();
-  const { configured, companyId } = useAuth();
+  const { configured, companyId, currentRole } = useAuth();
   const useRealData = configured && !!companyId;
+  const showFinance = !useRealData || canSeeFinance(currentRole);
 
   const [order, setOrder] = useState<Order | null>(
     useRealData ? null : mockOrders.find((o) => o.id === id) ?? mockOrders[0],
@@ -457,8 +459,8 @@ export default function OrderDetails() {
               <Row label="Ткань" value={order.fabric} />
               <Row label="Цвета" value={order.colors.join(", ")} />
               <Row label="Количество" value={`${formatNumber(order.qty)} шт`} />
-              <Row label="Цена за ед." value={formatSom(order.unitPrice)} />
-              <Row label="Себестоимость ед." value={formatSom(order.unitCost)} />
+              {showFinance && <Row label="Цена за ед." value={formatSom(order.unitPrice)} />}
+              {showFinance && <Row label="Себестоимость ед." value={formatSom(order.unitCost)} />}
               <Row label="Приоритет" value={order.priority === "high" ? "Высокий" : order.priority === "normal" ? "Обычный" : "Низкий"} />
             </dl>
             {order.comment && (
@@ -468,7 +470,8 @@ export default function OrderDetails() {
             )}
           </Card>
 
-          {/* Finance */}
+          {/* Finance — скрыто для технолога / OTK / склада / staff */}
+          {showFinance && (
           <Card title="Финансы по заказу">
             <div className="space-y-2 text-sm">
               <Row label="Выручка" value={<span className="font-bold text-ink-900">{formatSom(order.revenue)}</span>} />
@@ -498,8 +501,9 @@ export default function OrderDetails() {
               </ul>
             </div>
           </Card>
+          )}
 
-          {/* Expenses */}
+          {/* Expenses — технолог сам их записывает (купил фурнитуру), оставляем видимыми */}
           {canLogWork && (
             <Card
               title="Расходы по заказу"

@@ -13,7 +13,8 @@ interface InviteUserModalProps {
 }
 
 const ROLE_OPTIONS: { value: VisibleRole; label: string }[] = [
-  { value: "manager", label: "Менеджер — заказы, склад, сотрудники" },
+  { value: "manager", label: "Менеджер — операционка + финансы" },
+  { value: "technologist", label: "Технолог — производство без финансов" },
   { value: "warehouse", label: "Склад — материалы и движения" },
   { value: "qc", label: "ОТК — этап ОТК, брак" },
   { value: "staff", label: "Сотрудник — только просмотр" },
