@@ -175,7 +175,7 @@ export default function Employees() {
                         </div>
                       </td>
                       <td className="px-3 py-3 align-middle"><Badge tone="brand">{e.role}</Badge></td>
-                      <td className="px-3 py-3 align-middle text-ink-800">{e.stage}</td>
+                      <td className="px-3 py-3 align-middle text-ink-800">{e.stage ?? <span className="text-ink-600">—</span>}</td>
                       <td className="px-3 py-3 align-middle">
                         {e.norm > 0 ? (
                           <div className="min-w-[150px]">

@@ -171,7 +171,9 @@ export interface Employee {
   id: string;
   name: string;
   role: EmployeeRole;
-  stage: StageName;
+  // null = «не назначен на конкретный этап» — это валидно для технолога,
+  // мастера, менеджера и других руководящих позиций.
+  stage: StageName | null;
   monthDone: number; // изделия за месяц
   defectsPct: number; // 0..100
   payType: PayType;

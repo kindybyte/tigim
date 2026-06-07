@@ -19,22 +19,26 @@ const STAGES: StageName[] = [
   "Готово",
 ];
 
-// Hint of a sensible stage for the well-known roles. For custom roles falls
-// back to "Пошив". Comparison is case-insensitive.
-const STAGE_HINTS: Record<string, StageName> = {
+// Подсказка этапа по должности. Управляющие позиции (технолог, мастер,
+// менеджер) не привязаны к этапу — для них null = «не назначен».
+// Если должность не известна — тоже не назначаем, пусть user выберет
+// явно, если нужно.
+const STAGE_HINTS: Record<string, StageName | null> = {
   "закройщик": "Раскрой",
   "швея": "Пошив",
   "отк": "ОТК",
+  "контролёр отк": "ОТК",
   "упаковщик": "Упаковка",
-  "мастер цеха": "Пошив",
-  "менеджер": "Пошив",
-  "технолог": "Пошив",
-  "кладовщик": "Упаковка",
   "гладильщик": "Упаковка",
+  "кладовщик": null,
+  "мастер цеха": null,
+  "менеджер": null,
+  "технолог": null,
 };
 
-function suggestStage(role: string): StageName {
-  return STAGE_HINTS[role.trim().toLowerCase()] ?? "Пошив";
+function suggestStage(role: string): StageName | null {
+  const key = role.trim().toLowerCase();
+  return key in STAGE_HINTS ? STAGE_HINTS[key] : null;
 }
 
 export default function EmployeeFormModal({
@@ -45,7 +49,8 @@ export default function EmployeeFormModal({
 }: EmployeeFormModalProps) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("Швея");
-  const [stage, setStage] = useState<StageName>("Пошив");
+  // "" = не назначен (валидное значение).
+  const [stage, setStage] = useState<StageName | "">("Пошив");
   const [stageManuallyEdited, setStageManuallyEdited] = useState(false);
   const [payType, setPayType] = useState<PayType>("monthly");
   const [norm, setNorm] = useState("");
@@ -82,9 +87,11 @@ export default function EmployeeFormModal({
     }
   }, [open]);
 
-  // Auto-set stage when role changes (unless user has overridden it)
+  // Auto-set stage when role changes (unless user has overridden it).
+  // Для технолога/мастера/менеджера suggestStage возвращает null →
+  // ставим "" (не назначен).
   useEffect(() => {
-    if (!stageManuallyEdited) setStage(suggestStage(role));
+    if (!stageManuallyEdited) setStage(suggestStage(role) ?? "");
   }, [role, stageManuallyEdited]);
 
   if (!open) return null;
@@ -102,7 +109,9 @@ export default function EmployeeFormModal({
       await createEmployee(companyId, {
         name: name.trim(),
         role: trimmedRole,
-        stage,
+        // Пустая строка означает «не назначен» — передаём undefined,
+        // lib запишет null в БД.
+        stage: stage || undefined,
         norm: parseInt(norm) || 0,
         payType,
         salary: payType === "monthly" ? parseFloat(salary) || 0 : 0,
@@ -179,18 +188,24 @@ export default function EmployeeFormModal({
             </div>
 
             <div>
-              <label htmlFor="emp-stage" className="label">Этап</label>
+              <label htmlFor="emp-stage" className="label">
+                Этап <span className="text-ink-600">(если работает на конкретном)</span>
+              </label>
               <select
                 id="emp-stage"
                 value={stage}
                 onChange={(e) => {
-                  setStage(e.target.value as StageName);
+                  setStage(e.target.value as StageName | "");
                   setStageManuallyEdited(true);
                 }}
                 className="input mt-1.5"
               >
-                {STAGES.map((s) => <option key={s}>{s}</option>)}
+                <option value="">— не назначен —</option>
+                {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              <p className="mt-1 text-[11px] text-ink-600">
+                Технолог/мастер/менеджер обычно работают над всеми этапами — оставьте «не назначен».
+              </p>
             </div>
 
             <div className="sm:col-span-2">

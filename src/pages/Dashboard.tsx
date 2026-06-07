@@ -348,7 +348,9 @@ export default function Dashboard() {
                             <p className="truncate text-sm font-semibold text-ink-900">{e.name}</p>
                             <span className="text-xs font-semibold tabular-nums text-ink-800">{e.progressPct}%</span>
                           </div>
-                          <p className="truncate text-xs text-ink-600">{e.role} · {e.stage}</p>
+                          <p className="truncate text-xs text-ink-600">
+                            {e.role}{e.stage ? ` · ${e.stage}` : ""}
+                          </p>
                           <ProgressBar value={Math.min(e.progressPct, 120)} tone={tone} className="mt-1.5" />
                         </div>
                       </li>

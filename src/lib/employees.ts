@@ -39,7 +39,10 @@ function mapEmployee(row: EmployeeRow): Employee {
     id: row.id,
     name: row.name,
     role: row.role,
-    stage: row.stage ?? "Пошив",
+    // Сохраняем null как есть — это «не назначен на этап».
+    // Раньше тут был ?? "Пошив", из-за чего технологи и мастера
+    // отображались как швеи.
+    stage: row.stage ?? null,
     monthDone: 0, // computed from order_stages once production data is mature
     defectsPct: 0, // computed from defects
     payType: row.pay_type ?? "monthly",
