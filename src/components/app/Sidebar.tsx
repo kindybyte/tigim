@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   Users,
   Wallet,
-  Rocket,
   FileBarChart,
   Settings,
   X,
@@ -119,20 +118,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="mx-3 mb-4 rounded-2xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-4 text-white">
-          <div className="flex items-center gap-2 text-xs font-medium text-brand-100">
-            <Rocket className="h-3.5 w-3.5" /> Tigim Pro
-          </div>
-          <p className="mt-2 text-sm font-semibold leading-snug">
-            Полная аналитика цеха
-          </p>
-          <p className="mt-1 text-xs text-brand-100/80">
-            Заказы, склад, брак и финансы в одном окне
-          </p>
-          <button className="mt-3 w-full rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white backdrop-blur hover:bg-white/15">
-            Узнать больше
-          </button>
-        </div>
       </aside>
     </>
   );
