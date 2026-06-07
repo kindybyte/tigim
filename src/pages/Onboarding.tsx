@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Boxes,
@@ -9,7 +10,6 @@ import {
   Factory,
   Loader2,
   LogOut,
-  Sparkles,
   Users,
   Wallet,
   Workflow,
@@ -27,7 +27,7 @@ const FEATURES = [
   { icon: Boxes, text: "Склад тканей и фурнитуры" },
   { icon: Users, text: "Сотрудники, нормы, зарплаты" },
   { icon: Wallet, text: "Финансовая аналитика" },
-  { icon: Sparkles, text: "ИИ-помощник" },
+  { icon: AlertTriangle, text: "Учёт брака и потерь" },
 ];
 
 export default function Onboarding() {

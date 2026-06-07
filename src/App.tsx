@@ -24,7 +24,8 @@ const Warehouse = lazy(() => import("./pages/Warehouse"));
 const Defects = lazy(() => import("./pages/Defects"));
 const Employees = lazy(() => import("./pages/Employees"));
 const Finance = lazy(() => import("./pages/Finance"));
-const AIAssistant = lazy(() => import("./pages/AIAssistant"));
+// ИИ-помощник временно скрыт до выкатки в production. Файл оставлен.
+// const AIAssistant = lazy(() => import("./pages/AIAssistant"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
 
@@ -60,7 +61,6 @@ export default function App() {
             <Route path="defects" element={<Defects />} />
             <Route path="employees" element={<Employees />} />
             <Route path="finance" element={<Finance />} />
-            <Route path="ai" element={<AIAssistant />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
           </Route>

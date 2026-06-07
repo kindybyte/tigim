@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, ChevronDown, HelpCircle, LogOut, Menu, Search } from "lucide-react";
 import Avatar from "../ui/Avatar";
 import { company } from "../../data/mockData";
@@ -12,8 +12,38 @@ interface TopbarProps {
 export default function Topbar({ onOpenSidebar }: TopbarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+  const notifRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const { user, signOut, configured } = useAuth();
+
+  // Закрываем дропдауны при клике/тапе вне их или при Escape.
+  useEffect(() => {
+    if (!profileOpen && !notifOpen) return;
+    function handlePointer(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node | null;
+      if (profileOpen && profileRef.current && target && !profileRef.current.contains(target)) {
+        setProfileOpen(false);
+      }
+      if (notifOpen && notifRef.current && target && !notifRef.current.contains(target)) {
+        setNotifOpen(false);
+      }
+    }
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("touchstart", handlePointer, { passive: true });
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("touchstart", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [profileOpen, notifOpen]);
 
   // Display name: real user metadata if logged in, otherwise mock company owner.
   const displayName =
@@ -60,10 +90,13 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
         </button>
 
         {/* Notifications */}
-        <div className="relative">
+        <div className="relative" ref={notifRef}>
           <button
             type="button"
-            onClick={() => setNotifOpen((v) => !v)}
+            onClick={() => {
+              setNotifOpen((v) => !v);
+              setProfileOpen(false);
+            }}
             className="relative grid h-9 w-9 place-items-center rounded-lg text-ink-600 hover:bg-panel-muted"
             aria-label="Уведомления"
           >
@@ -113,10 +146,13 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
         </div>
 
         {/* Profile */}
-        <div className="relative">
+        <div className="relative" ref={profileRef}>
           <button
             type="button"
-            onClick={() => setProfileOpen((v) => !v)}
+            onClick={() => {
+              setProfileOpen((v) => !v);
+              setNotifOpen(false);
+            }}
             className="flex items-center gap-2.5 rounded-lg p-1 pr-2 transition hover:bg-panel-muted"
           >
             <Avatar name={displayName} color="#2563EB" size="sm" />

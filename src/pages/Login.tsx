@@ -177,7 +177,7 @@ export default function Login() {
                 "Все заказы и этапы — в одном окне",
                 "Kanban-доска производства",
                 "Учёт брака и потерь в деньгах",
-                "ИИ-помощник для быстрых ответов",
+                "Финансовая аналитика по заказам",
               ].map((t) => (
                 <li key={t} className="flex items-center gap-3">
                   <CheckCircle2 className="h-5 w-5 text-brand-200" />

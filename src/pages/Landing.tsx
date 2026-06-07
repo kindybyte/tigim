@@ -204,7 +204,7 @@ export default function Landing() {
               { t: "Зарплаты и сотрудники", d: "Производительность, нормы и зарплата по каждому работнику.", i: Users, c: "success" },
               { t: "Финансовая аналитика", d: "Выручка, себестоимость, маржа по заказу и по месяцу.", i: BarChart3, c: "brand" },
               { t: "Складская дисциплина", d: "Приход, расход, списание материалов с историей операций.", i: Truck, c: "info" },
-              { t: "ИИ-помощник", d: "Спросите простыми словами — система ответит.", i: Sparkles, c: "purple" },
+              { t: "Отчёты по периодам", d: "Выгрузка в Excel по заказам, складу, зарплатам и финансам.", i: BarChart3, c: "purple" },
             ] as const).map((f) => (
               <FeatureCard key={f.t} {...f} />
             ))}
@@ -278,44 +278,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* AI */}
-      <section className="border-t border-panel-border bg-gradient-to-br from-panel via-panel-hover to-brand-900 py-20 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-brand-100 backdrop-blur">
-                <Sparkles className="h-3.5 w-3.5" /> ИИ-помощник
-              </span>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-                Спрашивайте систему простыми словами
-              </h2>
-              <p className="mt-3 max-w-md text-base text-brand-100/85">
-                Без сложных отчётов. Просто задайте вопрос — ИИ-помощник Tigim
-                посмотрит данные и ответит.
-              </p>
-
-              <ul className="mt-6 space-y-2.5">
-                {[
-                  "Какие заказы опаздывают?",
-                  "Сколько ткани осталось?",
-                  "Где больше всего брака?",
-                  "Сколько прибыли за месяц?",
-                ].map((q) => (
-                  <li key={q} className="flex items-center gap-3 text-sm">
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-white/10">
-                      <Sparkles className="h-3 w-3 text-brand-200" />
-                    </span>
-                    «{q}»
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <ChatPreview />
-          </div>
-        </div>
-      </section>
-
       {/* PRICING */}
       <section id="pricing" className="border-t border-panel-border bg-surface py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -368,7 +330,7 @@ export default function Landing() {
                   "Несколько участков",
                   "Роли сотрудников",
                   "Расширенная аналитика",
-                  "ИИ-помощник Pro",
+                  "Приоритетная поддержка",
                   "Индивидуальная настройка",
                 ],
                 cta: "Связаться",
@@ -530,7 +492,7 @@ function HeroVisual() {
         <div className="grid grid-cols-12 gap-4 p-5">
           {/* mini sidebar */}
           <div className="col-span-3 hidden flex-col gap-1.5 sm:flex">
-            {["Дашборд","Заказы","Производство","Склад","Брак","Сотрудники","Финансы","ИИ-помощник"].map((l, i) => (
+            {["Дашборд","Заказы","Производство","Склад","Брак","Сотрудники","Финансы","Отчёты"].map((l, i) => (
               <div
                 key={l}
                 className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] ${
@@ -620,50 +582,3 @@ function HeroVisual() {
   );
 }
 
-function ChatPreview() {
-  return (
-    <div className="relative">
-      <div className="absolute -inset-4 rounded-3xl bg-brand-500/20 blur-2xl" />
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-panel text-ink-900 shadow-soft">
-        <div className="flex items-center gap-2 border-b border-panel-border bg-panel-muted/80 px-4 py-3">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-teal-500 text-white">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Помощник Tigim</p>
-            <p className="text-[11px] text-ink-600">Онлайн • отвечает мгновенно</p>
-          </div>
-        </div>
-
-        <div className="space-y-3 p-4">
-          <div className="ml-auto max-w-[80%] rounded-2xl rounded-tr-sm bg-brand-600 px-3 py-2 text-sm text-white">
-            Какие заказы могут опоздать?
-          </div>
-          <div className="max-w-[88%] rounded-2xl rounded-tl-sm bg-panel-muted px-3 py-2.5 text-sm text-ink-900">
-            Сегодня 2 заказа в зоне риска:
-            <div className="mt-2 grid gap-1.5">
-              <div className="flex items-center justify-between rounded-lg bg-panel px-2.5 py-1.5 text-xs">
-                <span className="font-semibold">#1045 Футболки</span>
-                <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-300">+2 дня</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg bg-panel px-2.5 py-1.5 text-xs">
-                <span className="font-semibold">#1050 Платья</span>
-                <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-semibold text-amber-300">риск</span>
-              </div>
-            </div>
-            <p className="mt-2 text-xs text-ink-600">
-              Рекомендация: добавить 2 швеи на #1045 или перенести часть на вечернюю смену.
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-panel-border bg-panel px-4 py-3">
-          <div className="flex items-center gap-2 rounded-xl border border-panel-border bg-panel px-3 py-2 text-sm text-ink-600">
-            Спросите что-нибудь…
-            <span className="ml-auto rounded-md bg-brand-600 px-2.5 py-1 text-xs font-semibold text-white">↑</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
