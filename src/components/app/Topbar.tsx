@@ -1,25 +1,62 @@
-import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, HelpCircle, LogOut, Menu, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Bell,
+  Boxes,
+  ChevronDown,
+  ClipboardList,
+  HelpCircle,
+  Loader2,
+  LogOut,
+  Menu,
+  Search,
+  Users,
+  X,
+} from "lucide-react";
 import Avatar from "../ui/Avatar";
 import { company } from "../../data/mockData";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
+import {
+  isResultsEmpty,
+  searchGlobal,
+  type SearchResult,
+  type SearchResults,
+} from "../../lib/search";
 
 interface TopbarProps {
   onOpenSidebar: () => void;
 }
 
+const EMPTY_RESULTS: SearchResults = { orders: [], materials: [], employees: [] };
+
 export default function Topbar({ onOpenSidebar }: TopbarProps) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResults>(EMPTY_RESULTS);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
   const profileRef = useRef<HTMLDivElement | null>(null);
   const notifRef = useRef<HTMLDivElement | null>(null);
-  const navigate = useNavigate();
-  const { user, signOut, configured } = useAuth();
+  const searchRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Закрываем дропдауны при клике/тапе вне их или при Escape.
+  const navigate = useNavigate();
+  const { user, signOut, configured, companyId } = useAuth();
+  const canSearch = configured && !!companyId;
+
+  // Плоский список для клавиатурной навигации.
+  const flatResults: SearchResult[] = useMemo(
+    () => [...searchResults.orders, ...searchResults.materials, ...searchResults.employees],
+    [searchResults],
+  );
+
+  // Закрываем дропдауны при клике/тапе вне или по Escape.
   useEffect(() => {
-    if (!profileOpen && !notifOpen) return;
+    if (!profileOpen && !notifOpen && !searchOpen) return;
     function handlePointer(event: MouseEvent | TouchEvent) {
       const target = event.target as Node | null;
       if (profileOpen && profileRef.current && target && !profileRef.current.contains(target)) {
@@ -28,11 +65,16 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
       if (notifOpen && notifRef.current && target && !notifRef.current.contains(target)) {
         setNotifOpen(false);
       }
+      if (searchOpen && searchRef.current && target && !searchRef.current.contains(target)) {
+        setSearchOpen(false);
+      }
     }
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setProfileOpen(false);
         setNotifOpen(false);
+        setSearchOpen(false);
+        searchInputRef.current?.blur();
       }
     }
     document.addEventListener("mousedown", handlePointer);
@@ -43,7 +85,70 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
       document.removeEventListener("touchstart", handlePointer);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [profileOpen, notifOpen]);
+  }, [profileOpen, notifOpen, searchOpen]);
+
+  // Ctrl+K / Cmd+K — фокус в поиск.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Debounced search.
+  useEffect(() => {
+    if (!canSearch) return;
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults(EMPTY_RESULTS);
+      setSearchLoading(false);
+      setSearchError(null);
+      return;
+    }
+    setSearchLoading(true);
+    setSearchError(null);
+    const handle = setTimeout(async () => {
+      try {
+        const res = await searchGlobal(companyId!, q);
+        setSearchResults(res);
+        setActiveIndex(0);
+      } catch (err) {
+        setSearchError(err instanceof Error ? err.message : "Ошибка поиска");
+        setSearchResults(EMPTY_RESULTS);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 220);
+    return () => clearTimeout(handle);
+  }, [searchQuery, canSearch, companyId]);
+
+  function goToResult(r: SearchResult) {
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (r.kind === "order") navigate(`/app/orders/${r.number}`);
+    else if (r.kind === "material") navigate("/app/warehouse");
+    else navigate("/app/employees");
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!searchOpen || flatResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, flatResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = flatResults[activeIndex];
+      if (item) goToResult(item);
+    }
+  }
 
   // Display name: real user metadata if logged in, otherwise mock company owner.
   const displayName =
@@ -57,6 +162,9 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
     navigate("/");
   }
 
+  const queryTrimmed = searchQuery.trim();
+  const showDropdown = searchOpen && queryTrimmed.length > 0;
+
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-panel-border bg-surface/85 px-4 backdrop-blur sm:px-6">
       <button
@@ -68,16 +176,81 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      <div className="relative flex max-w-xl flex-1 items-center">
+      <div className="relative flex max-w-xl flex-1 items-center" ref={searchRef}>
         <Search className="pointer-events-none absolute left-3 h-4 w-4 text-ink-600" />
         <input
+          ref={searchInputRef}
           type="search"
-          placeholder="Поиск заказов, клиентов, материалов…"
-          className="input pl-9"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setSearchOpen(true);
+          }}
+          onFocus={() => setSearchOpen(true)}
+          onKeyDown={handleSearchKeyDown}
+          placeholder={
+            canSearch ? "Поиск заказов, клиентов, материалов…" : "Поиск (войдите в аккаунт)"
+          }
+          disabled={!canSearch}
+          className="input pl-9 pr-16 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-autocomplete="list"
+          aria-expanded={showDropdown}
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery("");
+              setSearchResults(EMPTY_RESULTS);
+              searchInputRef.current?.focus();
+            }}
+            aria-label="Очистить"
+            className="absolute right-12 grid h-6 w-6 place-items-center rounded-md text-ink-600 hover:bg-panel-muted hover:text-ink-900"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
         <span className="absolute right-3 hidden text-[11px] font-medium text-ink-600 md:block">
           <span className="kbd">Ctrl</span> <span className="kbd">K</span>
         </span>
+
+        {showDropdown && (
+          <div className="absolute left-0 right-0 top-12 z-30 max-h-[70vh] origin-top overflow-y-auto rounded-2xl border border-panel-border bg-panel p-1.5 shadow-soft animate-fade-in">
+            {searchLoading && (
+              <div className="flex items-center gap-2 px-3 py-3 text-sm text-ink-600">
+                <Loader2 className="h-4 w-4 animate-spin" /> Ищем…
+              </div>
+            )}
+            {searchError && !searchLoading && (
+              <div className="px-3 py-3 text-sm text-rose-300">{searchError}</div>
+            )}
+            {!searchLoading &&
+              !searchError &&
+              queryTrimmed.length < 2 && (
+                <div className="px-3 py-3 text-xs text-ink-600">
+                  Введите минимум 2 символа
+                </div>
+              )}
+            {!searchLoading &&
+              !searchError &&
+              queryTrimmed.length >= 2 &&
+              isResultsEmpty(searchResults) && (
+                <div className="px-3 py-4 text-sm text-ink-600">
+                  Ничего не нашли по «{queryTrimmed}»
+                </div>
+              )}
+
+            {!searchLoading && !searchError && !isResultsEmpty(searchResults) && (
+              <ResultGroups
+                results={searchResults}
+                flat={flatResults}
+                activeIndex={activeIndex}
+                onSelect={goToResult}
+                onHover={setActiveIndex}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-1.5">
@@ -190,5 +363,127 @@ export default function Topbar({ onOpenSidebar }: TopbarProps) {
         </div>
       </div>
     </header>
+  );
+}
+
+interface ResultGroupsProps {
+  results: SearchResults;
+  flat: SearchResult[];
+  activeIndex: number;
+  onSelect: (r: SearchResult) => void;
+  onHover: (i: number) => void;
+}
+
+function ResultGroups({ results, flat, activeIndex, onSelect, onHover }: ResultGroupsProps) {
+  function indexOf(r: SearchResult): number {
+    return flat.findIndex((x) => x.kind === r.kind && x.id === r.id);
+  }
+  return (
+    <div className="space-y-2">
+      {results.orders.length > 0 && (
+        <div>
+          <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
+            Заказы
+          </p>
+          <ul>
+            {results.orders.map((r) => {
+              const i = indexOf(r);
+              return (
+                <li key={`o-${r.id}`}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => onHover(i)}
+                    onClick={() => onSelect(r)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+                      i === activeIndex ? "bg-panel-muted" : "hover:bg-panel-muted/60"
+                    }`}
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500/15 text-brand-300">
+                      <ClipboardList className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">
+                        #{r.number} · {r.product}
+                      </p>
+                      <p className="truncate text-xs text-ink-600">
+                        {r.client} · {r.status}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {results.materials.length > 0 && (
+        <div>
+          <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
+            Материалы
+          </p>
+          <ul>
+            {results.materials.map((r) => {
+              const i = indexOf(r);
+              return (
+                <li key={`m-${r.id}`}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => onHover(i)}
+                    onClick={() => onSelect(r)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+                      i === activeIndex ? "bg-panel-muted" : "hover:bg-panel-muted/60"
+                    }`}
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-teal-500/15 text-teal-300">
+                      <Boxes className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">{r.name}</p>
+                      <p className="truncate text-xs text-ink-600">
+                        {r.type} · остаток {r.stock} {r.unit}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {results.employees.length > 0 && (
+        <div>
+          <p className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-ink-600">
+            Сотрудники
+          </p>
+          <ul>
+            {results.employees.map((r) => {
+              const i = indexOf(r);
+              return (
+                <li key={`e-${r.id}`}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => onHover(i)}
+                    onClick={() => onSelect(r)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
+                      i === activeIndex ? "bg-panel-muted" : "hover:bg-panel-muted/60"
+                    }`}
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-500/15 text-amber-300">
+                      <Users className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">{r.name}</p>
+                      <p className="truncate text-xs text-ink-600">{r.role}</p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
