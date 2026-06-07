@@ -130,11 +130,11 @@ export default function Signup() {
                       id="signup-pw"
                       type={showPassword ? "text" : "password"}
                       required
-                      minLength={6}
+                      minLength={8}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="input pr-10"
-                      placeholder="Минимум 6 символов"
+                      placeholder="Минимум 8 символов"
                       autoComplete="new-password"
                     />
                     <button

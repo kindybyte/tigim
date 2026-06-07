@@ -24,7 +24,7 @@ import {
 } from "../data/mockData";
 import type { ChartPoint, Defect } from "../types";
 import { useAuth } from "../lib/auth";
-import { listDefects, subscribeToDefects } from "../lib/defects";
+import { getSignedDefectPhotoUrl, listDefects, subscribeToDefects } from "../lib/defects";
 
 type DefectWithPhoto = Defect & { photoUrl?: string };
 
@@ -246,18 +246,7 @@ export default function Defects() {
                       </td>
                       <td className="py-3">
                         {d.photoUrl ? (
-                          <a
-                            href={d.photoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img
-                              src={d.photoUrl}
-                              alt="brak"
-                              className="h-8 w-8 rounded-md object-cover ring-1 ring-panel-border hover:opacity-80"
-                            />
-                          </a>
+                          <DefectPhotoThumb pathOrUrl={d.photoUrl} />
                         ) : (
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-panel-muted text-ink-600">
                             <ImageIcon className="h-4 w-4" />
@@ -314,5 +303,55 @@ export default function Defects() {
         />
       )}
     </div>
+  );
+}
+
+// Bucket приватный (миграция 0013) — каждое фото требует signed URL.
+// Подгружаем лениво на mount строки. Ссылка живёт 1 час.
+function DefectPhotoThumb({ pathOrUrl }: { pathOrUrl: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getSignedDefectPhotoUrl(pathOrUrl)
+      .then((u) => {
+        if (cancelled) return;
+        if (!u) setFailed(true);
+        else setUrl(u);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pathOrUrl]);
+
+  if (failed) {
+    return (
+      <span
+        title="Не удалось загрузить фото"
+        className="grid h-8 w-8 place-items-center rounded-lg bg-rose-500/15 text-rose-300"
+      >
+        <ImageIcon className="h-4 w-4" />
+      </span>
+    );
+  }
+  if (!url) {
+    return (
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-panel-muted text-ink-600">
+        <Loader2 className="h-3 w-3 animate-spin" />
+      </span>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+      <img
+        src={url}
+        alt="brak"
+        className="h-8 w-8 rounded-md object-cover ring-1 ring-panel-border hover:opacity-80"
+      />
+    </a>
   );
 }

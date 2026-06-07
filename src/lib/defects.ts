@@ -110,12 +110,31 @@ export async function createDefect(companyId: string, input: NewDefectInput): Pr
     if (upErr) {
       console.warn("[defects] photo upload failed:", upErr.message);
     } else {
-      const { data: pub } = supabase.storage.from("defect-photos").getPublicUrl(path);
-      await supabase.from("defects").update({ photo_url: pub.publicUrl }).eq("id", row.id);
+      // Bucket приватный (миграция 0013) — храним storage-path, а не публичный URL.
+      // При отображении фронт получает signed URL через getSignedDefectPhotoUrl.
+      await supabase.from("defects").update({ photo_url: path }).eq("id", row.id);
     }
   }
 
   return row.id;
+}
+
+/**
+ * Получить временный (1 час) signed URL для отображения фото брака.
+ * Принимает либо storage-path (новые записи), либо полный URL (legacy
+ * до миграции 0013) — во втором случае URL вернётся как есть и скорее
+ * всего не сработает, так как bucket теперь приватный.
+ */
+export async function getSignedDefectPhotoUrl(pathOrUrl: string): Promise<string | null> {
+  if (pathOrUrl.startsWith("http")) return pathOrUrl;
+  const { data, error } = await getSupabase().storage
+    .from("defect-photos")
+    .createSignedUrl(pathOrUrl, 3600);
+  if (error) {
+    console.warn("[defects] signed url failed:", error.message);
+    return null;
+  }
+  return data?.signedUrl ?? null;
 }
 
 export async function deleteDefect(defectId: string): Promise<void> {

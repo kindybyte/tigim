@@ -261,7 +261,7 @@ function translateAuthError(msg: string): string {
   if (m.includes("email not confirmed")) return "Email не подтверждён. Проверьте почту.";
   if (m.includes("user already")) return "Пользователь с таким email уже зарегистрирован";
   if (m.includes("password should be") || m.includes("weak"))
-    return "Пароль слишком короткий (минимум 6 символов)";
+    return "Пароль слишком короткий (минимум 8 символов)";
   if (m.includes("rate limit") || m.includes("too many"))
     return "Слишком много попыток. Подождите и попробуйте снова.";
   if (m.includes("network") || m.includes("failed to fetch"))

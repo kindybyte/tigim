@@ -23,8 +23,8 @@ export default function ResetPassword() {
       setError("Пароли не совпадают");
       return;
     }
-    if (password.length < 6) {
-      setError("Пароль должен быть не короче 6 символов");
+    if (password.length < 8) {
+      setError("Пароль должен быть не короче 8 символов");
       return;
     }
 
@@ -91,11 +91,11 @@ export default function ResetPassword() {
                       id="rp-pw"
                       type={show ? "text" : "password"}
                       required
-                      minLength={6}
+                      minLength={8}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="input pr-10"
-                      placeholder="Минимум 6 символов"
+                      placeholder="Минимум 8 символов"
                       autoComplete="new-password"
                       autoFocus
                     />
@@ -116,7 +116,7 @@ export default function ResetPassword() {
                     id="rp-pw2"
                     type={show ? "text" : "password"}
                     required
-                    minLength={6}
+                    minLength={8}
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     className="input mt-1.5"
