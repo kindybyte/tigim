@@ -1,22 +1,25 @@
-import * as XLSX from "xlsx";
 import { getSupabase } from "./supabase";
 import { getFinanceData } from "./finance";
 
-// ---------- Excel ----------
+// xlsx — ~280 KB после минификации. Грузим лениво в момент когда
+// пользователь нажал «Скачать», а не на старте приложения.
+// Тип импортируется без runtime-стоимости (import type).
+type XLSXModule = typeof import("xlsx");
 
-function downloadWorkbook(wb: XLSX.WorkBook, filename: string) {
-  XLSX.writeFile(wb, filename);
-}
-
-function sheetFromRows<T extends Record<string, unknown>>(rows: T[]) {
-  return XLSX.utils.json_to_sheet(rows);
+let xlsxPromise: Promise<XLSXModule> | null = null;
+function loadXlsx(): Promise<XLSXModule> {
+  if (!xlsxPromise) xlsxPromise = import("xlsx");
+  return xlsxPromise;
 }
 
 function timestamp(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ---------- Excel ----------
+
 export async function exportOrdersXlsx(companyId: string): Promise<void> {
+  const XLSX = await loadXlsx();
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from("orders")
@@ -45,11 +48,12 @@ export async function exportOrdersXlsx(companyId: string): Promise<void> {
   }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), "Заказы");
-  downloadWorkbook(wb, `tigim-orders-${timestamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Заказы");
+  XLSX.writeFile(wb, `tigim-orders-${timestamp()}.xlsx`);
 }
 
 export async function exportDefectsXlsx(companyId: string): Promise<void> {
+  const XLSX = await loadXlsx();
   const { data, error } = await getSupabase()
     .from("defects")
     .select("date, qty, reason, stage, loss, size, product, orders(number), employees(name)")
@@ -70,11 +74,12 @@ export async function exportDefectsXlsx(companyId: string): Promise<void> {
   }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), "Брак");
-  downloadWorkbook(wb, `tigim-defects-${timestamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Брак");
+  XLSX.writeFile(wb, `tigim-defects-${timestamp()}.xlsx`);
 }
 
 export async function exportEmployeesXlsx(companyId: string): Promise<void> {
+  const XLSX = await loadXlsx();
   const { data, error } = await getSupabase()
     .from("employees")
     .select("name, role, stage, norm, pay_type, salary, rate_per_piece, status")
@@ -94,11 +99,12 @@ export async function exportEmployeesXlsx(companyId: string): Promise<void> {
   }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), "Сотрудники");
-  downloadWorkbook(wb, `tigim-employees-${timestamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Сотрудники");
+  XLSX.writeFile(wb, `tigim-employees-${timestamp()}.xlsx`);
 }
 
 export async function exportWarehouseXlsx(companyId: string): Promise<void> {
+  const XLSX = await loadXlsx();
   const { data, error } = await getSupabase()
     .from("materials")
     .select("name, type, color, unit, stock, min_stock, price_per_unit, supplier")
@@ -119,11 +125,12 @@ export async function exportWarehouseXlsx(companyId: string): Promise<void> {
   }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows), "Склад");
-  downloadWorkbook(wb, `tigim-warehouse-${timestamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Склад");
+  XLSX.writeFile(wb, `tigim-warehouse-${timestamp()}.xlsx`);
 }
 
 export async function exportFinanceXlsx(companyId: string): Promise<void> {
+  const XLSX = await loadXlsx();
   const data = await getFinanceData(companyId);
 
   const ordersRows = data.orderFinancials.map((o) => ({
@@ -156,13 +163,13 @@ export async function exportFinanceXlsx(companyId: string): Promise<void> {
   }));
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(statsRows), "Сводка");
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(ordersRows), "По заказам");
-  XLSX.utils.book_append_sheet(wb, sheetFromRows(trendsRows), "Помесячно");
-  downloadWorkbook(wb, `tigim-finance-${timestamp()}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(statsRows), "Сводка");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ordersRows), "По заказам");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendsRows), "Помесячно");
+  XLSX.writeFile(wb, `tigim-finance-${timestamp()}.xlsx`);
 }
 
-// ---------- PDF via browser print ----------
+// ---------- PDF via browser print (нативный, без библиотек) ----------
 
 export function printCurrentPage(): void {
   window.print();
