@@ -117,6 +117,8 @@ export interface Material {
   priceCurrency: Currency;
 }
 
+export type WarehouseMode = "simple" | "full";
+
 export interface Company {
   id: string;
   name: string;
@@ -124,6 +126,7 @@ export interface Company {
   address: string | null;
   plan: "trial" | "start" | "pro" | "factory";
   usdRate: number;               // курс USD→KGS, дефолт 88
+  warehouseMode: WarehouseMode;  // simple = упрощённый UI склада, full = со всеми полями
   trialEndsAt: string | null;
 }
 

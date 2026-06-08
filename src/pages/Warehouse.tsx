@@ -30,6 +30,7 @@ export default function Warehouse() {
   const { configured, companyId, company } = useAuth();
   const useRealData = configured && !!companyId;
   const usdRate = company?.usdRate ?? 88;
+  const isSimple = (company?.warehouseMode ?? "full") === "simple";
 
   const [materials, setMaterials] = useState<Material[]>(useRealData ? [] : mockMaterials);
   const [loading, setLoading] = useState(useRealData);
@@ -77,12 +78,12 @@ export default function Warehouse() {
       const matchesQ =
         !q ||
         m.name.toLowerCase().includes(q) ||
-        m.color.toLowerCase().includes(q) ||
-        m.supplier.toLowerCase().includes(q);
+        (!isSimple && m.color.toLowerCase().includes(q)) ||
+        (!isSimple && m.supplier.toLowerCase().includes(q));
       const matchesT = typeFilter === "Все" || m.type === typeFilter;
       return matchesQ && matchesT;
     });
-  }, [materials, query, typeFilter]);
+  }, [materials, query, typeFilter, isSimple]);
 
   const lowCount = materials.filter((m) => m.stock < m.minStock).length;
   // Стоимость склада: USD-цены конвертируем по текущему курсу компании.
@@ -99,30 +100,34 @@ export default function Warehouse() {
     <div className="animate-fade-in">
       <PageHeader
         title="Склад"
-        description="Ткань, фурнитура и упаковка"
+        description={isSimple ? "Простой учёт остатков" : "Ткань, фурнитура и упаковка"}
         actions={
           <>
-            <button
-              onClick={() => openMovement("write_off")}
-              disabled={!useRealData || materials.length === 0}
-              className="btn-secondary"
-            >
-              <Trash2 className="h-4 w-4" /> Списать
-            </button>
-            <button
-              onClick={() => openMovement("out")}
-              disabled={!useRealData || materials.length === 0}
-              className="btn-secondary"
-            >
-              <ArrowUpFromLine className="h-4 w-4" /> Расход
-            </button>
-            <button
-              onClick={() => openMovement("in")}
-              disabled={!useRealData || materials.length === 0}
-              className="btn-secondary"
-            >
-              <ArrowDownToLine className="h-4 w-4" /> Приход
-            </button>
+            {!isSimple && (
+              <>
+                <button
+                  onClick={() => openMovement("write_off")}
+                  disabled={!useRealData || materials.length === 0}
+                  className="btn-secondary"
+                >
+                  <Trash2 className="h-4 w-4" /> Списать
+                </button>
+                <button
+                  onClick={() => openMovement("out")}
+                  disabled={!useRealData || materials.length === 0}
+                  className="btn-secondary"
+                >
+                  <ArrowUpFromLine className="h-4 w-4" /> Расход
+                </button>
+                <button
+                  onClick={() => openMovement("in")}
+                  disabled={!useRealData || materials.length === 0}
+                  className="btn-secondary"
+                >
+                  <ArrowDownToLine className="h-4 w-4" /> Приход
+                </button>
+              </>
+            )}
             <button
               onClick={() => setAddOpen(true)}
               disabled={!useRealData}
@@ -135,15 +140,17 @@ export default function Warehouse() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={`grid gap-4 ${isSimple ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
         <StatCard label="Позиций на складе" value={String(materials.length)} icon={Boxes} iconTone="brand" />
-        <StatCard
-          label="Низкий остаток"
-          value={`${lowCount} поз.`}
-          icon={AlertTriangle}
-          iconTone="warning"
-          hint="ниже минимального"
-        />
+        {!isSimple && (
+          <StatCard
+            label="Низкий остаток"
+            value={`${lowCount} поз.`}
+            icon={AlertTriangle}
+            iconTone="warning"
+            hint="ниже минимального"
+          />
+        )}
         <StatCard
           label="Стоимость склада"
           value={`${formatNumber(totalValue)} сом`}
@@ -161,7 +168,11 @@ export default function Warehouse() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по материалу, цвету, поставщику…"
+              placeholder={
+                isSimple
+                  ? "Поиск по материалу…"
+                  : "Поиск по материалу, цвету, поставщику…"
+              }
               className="input pl-9"
             />
           </div>
@@ -208,48 +219,62 @@ export default function Warehouse() {
                 <tr className="border-b border-panel-border bg-panel-muted/60 text-left text-[11px] font-semibold uppercase tracking-wider text-ink-600">
                   <th className="px-5 py-3">Материал</th>
                   <th className="px-3 py-3">Тип</th>
-                  <th className="px-3 py-3">Цвет</th>
+                  {!isSimple && <th className="px-3 py-3">Цвет</th>}
                   <th className="px-3 py-3 text-right">Остаток</th>
-                  <th className="px-3 py-3 text-right">Мин. остаток</th>
-                  <th className="px-3 py-3">Поставщик</th>
-                  <th className="px-3 py-3">Статус</th>
+                  {!isSimple && (
+                    <>
+                      <th className="px-3 py-3 text-right">Мин. остаток</th>
+                      <th className="px-3 py-3">Поставщик</th>
+                      <th className="px-3 py-3">Статус</th>
+                    </>
+                  )}
                   <th className="px-3 py-3 text-right">Цена/ед.</th>
                   <th className="px-3 py-3 text-right">Операции</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((m) => {
-                  const low = m.stock < m.minStock;
-                  const warn = !low && m.stock < m.minStock * 1.4;
+                  const low = !isSimple && m.stock < m.minStock;
+                  const warn = !isSimple && !low && m.stock < m.minStock * 1.4;
+                  const kgsPrice =
+                    m.priceCurrency === "USD" ? m.pricePerUnit * usdRate : m.pricePerUnit;
                   return (
                     <tr key={m.id} className="border-b border-panel-border last:border-0 hover:bg-panel-muted/50">
                       <td className="px-5 py-3 align-middle font-medium text-ink-900">{m.name}</td>
                       <td className="px-3 py-3 align-middle"><Badge tone="neutral">{m.type}</Badge></td>
-                      <td className="px-3 py-3 align-middle text-ink-800">{m.color || "—"}</td>
+                      {!isSimple && (
+                        <td className="px-3 py-3 align-middle text-ink-800">{m.color || "—"}</td>
+                      )}
                       <td className={`px-3 py-3 text-right align-middle font-semibold tabular-nums ${low ? "text-rose-300" : "text-ink-900"}`}>
                         {formatNumber(m.stock)} {m.unit}
                       </td>
-                      <td className="px-3 py-3 text-right align-middle text-ink-600 tabular-nums">
-                        {formatNumber(m.minStock)} {m.unit}
-                      </td>
-                      <td className="px-3 py-3 align-middle text-ink-800">{m.supplier || "—"}</td>
-                      <td className="px-3 py-3 align-middle">
-                        {low ? (
-                          <Badge tone="danger" dot>Низкий остаток</Badge>
-                        ) : warn ? (
-                          <Badge tone="warning" dot>Скоро закончится</Badge>
-                        ) : (
-                          <Badge tone="success" dot>В норме</Badge>
-                        )}
-                      </td>
+                      {!isSimple && (
+                        <>
+                          <td className="px-3 py-3 text-right align-middle text-ink-600 tabular-nums">
+                            {formatNumber(m.minStock)} {m.unit}
+                          </td>
+                          <td className="px-3 py-3 align-middle text-ink-800">{m.supplier || "—"}</td>
+                          <td className="px-3 py-3 align-middle">
+                            {low ? (
+                              <Badge tone="danger" dot>Низкий остаток</Badge>
+                            ) : warn ? (
+                              <Badge tone="warning" dot>Скоро закончится</Badge>
+                            ) : (
+                              <Badge tone="success" dot>В норме</Badge>
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="px-3 py-3 text-right align-middle tabular-nums">
-                        {m.priceCurrency === "USD" ? (
+                        {isSimple ? (
+                          <span>{formatNumber(kgsPrice)} сом</span>
+                        ) : m.priceCurrency === "USD" ? (
                           <div className="flex flex-col items-end leading-tight">
                             <span className="font-semibold text-ink-900">
                               ${formatNumber(m.pricePerUnit)}
                             </span>
                             <span className="text-[11px] text-ink-600">
-                              ≈ {formatNumber(m.pricePerUnit * usdRate)} сом
+                              ≈ {formatNumber(kgsPrice)} сом
                             </span>
                           </div>
                         ) : (
@@ -274,14 +299,16 @@ export default function Warehouse() {
                           >
                             <ArrowUpFromLine className="h-4 w-4" />
                           </button>
-                          <button
-                            onClick={() => openMovement("write_off", m.id)}
-                            disabled={!useRealData}
-                            className="rounded-md p-1.5 text-rose-300 hover:bg-rose-500/15 disabled:opacity-40 disabled:hover:bg-transparent"
-                            title="Списать"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!isSimple && (
+                            <button
+                              onClick={() => openMovement("write_off", m.id)}
+                              disabled={!useRealData}
+                              className="rounded-md p-1.5 text-rose-300 hover:bg-rose-500/15 disabled:opacity-40 disabled:hover:bg-transparent"
+                              title="Списать"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

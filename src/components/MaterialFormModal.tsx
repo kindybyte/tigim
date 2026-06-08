@@ -22,6 +22,7 @@ export default function MaterialFormModal({
 }: MaterialFormModalProps) {
   const { company } = useAuth();
   const usdRate = company?.usdRate ?? 88;
+  const isSimple = (company?.warehouseMode ?? "full") === "simple";
 
   const [name, setName] = useState("");
   const [type, setType] = useState<MaterialType>("ткань");
@@ -74,13 +75,13 @@ export default function MaterialFormModal({
       await createMaterial(companyId, {
         name: name.trim(),
         type,
-        color: color.trim() || undefined,
+        color: isSimple ? undefined : color.trim() || undefined,
         unit,
         stock: parseFloat(stock) || 0,
-        minStock: parseFloat(minStock) || 0,
+        minStock: isSimple ? 0 : parseFloat(minStock) || 0,
         pricePerUnit: parseFloat(pricePerUnit) || 0,
-        priceCurrency,
-        supplier: supplier.trim() || undefined,
+        priceCurrency: isSimple ? "KGS" : priceCurrency,
+        supplier: isSimple ? undefined : supplier.trim() || undefined,
       });
       onCreated();
     } catch (err) {
@@ -151,26 +152,30 @@ export default function MaterialFormModal({
                 {UNITS.map((u) => <option key={u}>{u}</option>)}
               </select>
             </div>
-            <div>
-              <label htmlFor="mat-color" className="label">Цвет</label>
-              <input
-                id="mat-color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="input mt-1.5"
-                placeholder="Чёрный"
-              />
-            </div>
-            <div>
-              <label htmlFor="mat-supplier" className="label">Поставщик</label>
-              <input
-                id="mat-supplier"
-                value={supplier}
-                onChange={(e) => setSupplier(e.target.value)}
-                className="input mt-1.5"
-                placeholder='ОсОО "Текстиль-Импорт"'
-              />
-            </div>
+            {!isSimple && (
+              <div>
+                <label htmlFor="mat-color" className="label">Цвет</label>
+                <input
+                  id="mat-color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="input mt-1.5"
+                  placeholder="Чёрный"
+                />
+              </div>
+            )}
+            {!isSimple && (
+              <div>
+                <label htmlFor="mat-supplier" className="label">Поставщик</label>
+                <input
+                  id="mat-supplier"
+                  value={supplier}
+                  onChange={(e) => setSupplier(e.target.value)}
+                  className="input mt-1.5"
+                  placeholder='ОсОО "Текстиль-Импорт"'
+                />
+              </div>
+            )}
             <div>
               <label htmlFor="mat-stock" className="label">Стартовый остаток</label>
               <input
@@ -184,19 +189,21 @@ export default function MaterialFormModal({
                 placeholder="120"
               />
             </div>
-            <div>
-              <label htmlFor="mat-min" className="label">Минимальный остаток</label>
-              <input
-                id="mat-min"
-                type="number"
-                step="0.001"
-                min="0"
-                value={minStock}
-                onChange={(e) => setMinStock(e.target.value)}
-                className="input mt-1.5"
-                placeholder="80"
-              />
-            </div>
+            {!isSimple && (
+              <div>
+                <label htmlFor="mat-min" className="label">Минимальный остаток</label>
+                <input
+                  id="mat-min"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={minStock}
+                  onChange={(e) => setMinStock(e.target.value)}
+                  className="input mt-1.5"
+                  placeholder="80"
+                />
+              </div>
+            )}
             <div className="sm:col-span-2">
               <label className="label">Цена за единицу</label>
               <div className="mt-1.5 flex gap-2">
@@ -211,32 +218,39 @@ export default function MaterialFormModal({
                   placeholder={priceCurrency === "USD" ? "5" : "580"}
                   aria-label="Цена"
                 />
-                <div className="inline-flex rounded-lg border border-panel-border bg-panel-muted p-1">
-                  <button
-                    type="button"
-                    onClick={() => setPriceCurrency("KGS")}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                      priceCurrency === "KGS"
-                        ? "bg-brand-600 text-white shadow-sm"
-                        : "text-ink-700 hover:text-ink-900"
-                    }`}
-                  >
+                {!isSimple && (
+                  <div className="inline-flex rounded-lg border border-panel-border bg-panel-muted p-1">
+                    <button
+                      type="button"
+                      onClick={() => setPriceCurrency("KGS")}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        priceCurrency === "KGS"
+                          ? "bg-brand-600 text-white shadow-sm"
+                          : "text-ink-700 hover:text-ink-900"
+                      }`}
+                    >
+                      сом
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPriceCurrency("USD")}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                        priceCurrency === "USD"
+                          ? "bg-brand-600 text-white shadow-sm"
+                          : "text-ink-700 hover:text-ink-900"
+                      }`}
+                    >
+                      USD
+                    </button>
+                  </div>
+                )}
+                {isSimple && (
+                  <span className="grid place-items-center rounded-lg border border-panel-border bg-panel-muted px-3 text-xs font-semibold text-ink-700">
                     сом
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPriceCurrency("USD")}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                      priceCurrency === "USD"
-                        ? "bg-brand-600 text-white shadow-sm"
-                        : "text-ink-700 hover:text-ink-900"
-                    }`}
-                  >
-                    USD
-                  </button>
-                </div>
+                  </span>
+                )}
               </div>
-              {priceCurrency === "USD" && pricePerUnit && (
+              {!isSimple && priceCurrency === "USD" && pricePerUnit && (
                 <p className="mt-1.5 text-xs text-ink-600">
                   ≈ {(parseFloat(pricePerUnit) * usdRate).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} сом
                   <span className="text-ink-600/70"> · по курсу {usdRate.toFixed(2)} сом/$, настраивается в Настройках</span>

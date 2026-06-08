@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           address: string | null;
           plan: Company["plan"];
           usd_rate: number | string;
+          warehouse_mode: Company["warehouseMode"] | null;
           trial_ends_at: string | null;
         } | null;
       };
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getSupabase()
           .from("company_members")
           .select(
-            "company_id, role, companies(id, name, phone, address, plan, usd_rate, trial_ends_at)",
+            "company_id, role, companies(id, name, phone, address, plan, usd_rate, warehouse_mode, trial_ends_at)",
           )
           .eq("user_id", uid)
           .limit(1)
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   typeof c.usd_rate === "string"
                     ? parseFloat(c.usd_rate)
                     : c.usd_rate ?? 88,
+                warehouseMode: c.warehouse_mode ?? "full",
                 trialEndsAt: c.trial_ends_at,
               }
             : null,

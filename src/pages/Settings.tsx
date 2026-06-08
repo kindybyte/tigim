@@ -38,6 +38,7 @@ import {
   type CompanyMember,
   type VisibleRole,
 } from "../lib/company";
+import type { WarehouseMode } from "../types";
 import {
   inviteUrl,
   listInvitations,
@@ -291,6 +292,7 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [usdRate, setUsdRate] = useState("");
+  const [warehouseMode, setWarehouseMode] = useState<WarehouseMode>("full");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -301,12 +303,14 @@ export default function Settings() {
       setPhone(company.phone ?? "");
       setAddress(company.address ?? "");
       setUsdRate(String(company.usdRate));
+      setWarehouseMode(company.warehouseMode);
     } else if (!isReal) {
       // Демо
       setName(mockCompany.name);
       setPhone(mockCompany.phone);
       setAddress(mockCompany.address);
       setUsdRate("88");
+      setWarehouseMode("full");
     }
   }, [company, isReal]);
 
@@ -321,6 +325,7 @@ export default function Settings() {
         phone: phone.trim() || null,
         address: address.trim() || null,
         usdRate: parseFloat(usdRate) || 88,
+        warehouseMode,
       });
       await refreshCompany();
       setSavedAt(new Date());
@@ -403,6 +408,48 @@ export default function Settings() {
                         disabled={!isReal}
                       />
                       <span className="text-sm font-semibold text-ink-700">сом</span>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 rounded-xl border border-panel-border bg-panel-muted/40 p-4">
+                    <label className="label">Режим склада</label>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      Управляет тем, какие поля видны в разделе «Склад». Данные не теряются — это
+                      только настройка интерфейса.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setWarehouseMode("simple")}
+                        disabled={!isReal}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          warehouseMode === "simple"
+                            ? "border-brand-500/60 bg-brand-500/10 ring-1 ring-brand-500/30"
+                            : "border-panel-border bg-panel hover:border-panel-border/80 hover:bg-panel-muted"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        <p className="text-sm font-semibold text-ink-900">Упрощённый</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
+                          Название, тип, остаток и средняя цена. Без USD, без минимального
+                          остатка, без поставщиков. Подходит большинству цехов.
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setWarehouseMode("full")}
+                        disabled={!isReal}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          warehouseMode === "full"
+                            ? "border-brand-500/60 bg-brand-500/10 ring-1 ring-brand-500/30"
+                            : "border-panel-border bg-panel hover:border-panel-border/80 hover:bg-panel-muted"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        <p className="text-sm font-semibold text-ink-900">Полный</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
+                          Все поля: цвет, поставщик, минимальный остаток, USD-цены с конвертацией,
+                          алерты низкого остатка, история движений.
+                        </p>
+                      </button>
                     </div>
                   </div>
                 </div>

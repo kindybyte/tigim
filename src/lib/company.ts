@@ -1,5 +1,5 @@
 import { getSupabase } from "./supabase";
-import type { Company } from "../types";
+import type { Company, WarehouseMode } from "../types";
 
 interface CompanyRow {
   id: string;
@@ -8,6 +8,7 @@ interface CompanyRow {
   address: string | null;
   plan: Company["plan"];
   usd_rate: number | string;
+  warehouse_mode: WarehouseMode | null;
   trial_ends_at: string | null;
 }
 
@@ -24,6 +25,7 @@ function mapRow(row: CompanyRow): Company {
     address: row.address,
     plan: row.plan,
     usdRate: num(row.usd_rate),
+    warehouseMode: row.warehouse_mode ?? "full",
     trialEndsAt: row.trial_ends_at,
   };
 }
@@ -31,7 +33,7 @@ function mapRow(row: CompanyRow): Company {
 export async function getCompany(companyId: string): Promise<Company | null> {
   const { data, error } = await getSupabase()
     .from("companies")
-    .select("id, name, phone, address, plan, usd_rate, trial_ends_at")
+    .select("id, name, phone, address, plan, usd_rate, warehouse_mode, trial_ends_at")
     .eq("id", companyId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -44,6 +46,7 @@ export interface UpdateCompanyInput {
   phone?: string | null;
   address?: string | null;
   usdRate?: number;
+  warehouseMode?: WarehouseMode;
 }
 
 // Все «видимые» в UI системные роли (master намеренно скрыт — см. roadmap).
@@ -165,6 +168,7 @@ export async function updateCompany(
   if (patch.phone !== undefined) updates.phone = patch.phone;
   if (patch.address !== undefined) updates.address = patch.address;
   if (patch.usdRate !== undefined) updates.usd_rate = patch.usdRate;
+  if (patch.warehouseMode !== undefined) updates.warehouse_mode = patch.warehouseMode;
 
   if (Object.keys(updates).length === 0) return;
 
