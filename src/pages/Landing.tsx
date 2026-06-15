@@ -9,8 +9,8 @@ import {
   Factory,
   Layers,
   ListChecks,
+  MessageCircle,
   PieChart,
-  Play,
   Shirt,
   ShoppingBag,
   Sparkles,
@@ -111,14 +111,18 @@ export default function Landing() {
                   Попробовать бесплатно
                   <ArrowRight className="h-4 w-4" />
                 </button>
-                <Link
-                  to="/app"
-                  onClick={() => track("cta_clicked", { source: "hero_view_demo" })}
+                <a
+                  href={`https://wa.me/996997448778?text=${encodeURIComponent(
+                    "Здравствуйте! Интересует Tigim для нашего цеха.",
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => track("cta_clicked", { source: "hero_whatsapp" })}
                   className="btn-secondary px-5 py-3 text-base"
                 >
-                  <Play className="h-4 w-4" />
-                  Посмотреть демо
-                </Link>
+                  <MessageCircle className="h-4 w-4" />
+                  Написать в WhatsApp
+                </a>
               </div>
 
               <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-ink-600">
