@@ -55,7 +55,7 @@ export default function Landing() {
           <div className="flex items-center gap-2">
             <Link
               to="/login"
-              className="btn-ghost hidden sm:inline-flex"
+              className="btn-ghost px-3"
               onClick={() => track("cta_clicked", { source: "header_login" })}
             >
               Войти
