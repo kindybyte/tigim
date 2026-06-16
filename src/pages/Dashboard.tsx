@@ -4,11 +4,9 @@ import {
   AlertTriangle,
   ArrowRight,
   ArrowUpRight,
-  Boxes,
   Briefcase,
   Loader2,
   PackageCheck,
-  Sparkles,
   TrendingUp,
   Wallet,
   Workflow,
@@ -129,14 +127,9 @@ export default function Dashboard() {
               : `Сегодня ${todayRu()} · добавьте первый заказ, чтобы дашборд ожил`
         }
         actions={
-          <>
-            <Link to="/app/ai" className="btn-secondary">
-              <Sparkles className="h-4 w-4 text-brand-300" /> Спросить помощника
-            </Link>
-            <Link to="/app/orders" className="btn-brand">
-              <Briefcase className="h-4 w-4" /> Добавить заказ
-            </Link>
-          </>
+          <Link to="/app/orders" className="btn-brand">
+            <Briefcase className="h-4 w-4" /> Добавить заказ
+          </Link>
         }
       />
 
@@ -408,24 +401,6 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* AI nudge */}
-          <div className="mt-6 overflow-hidden rounded-2xl border border-brand-500/30 bg-gradient-to-r from-brand-500/15 via-panel to-panel p-5 sm:flex sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-teal-500 text-white">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-ink-900">Помощник Tigim</p>
-                <p className="mt-0.5 text-sm text-ink-700">
-                  Скоро сможете спрашивать: «Какие заказы могут опоздать?», «Где больше всего брака?»
-                </p>
-              </div>
-            </div>
-            <Link to="/app/ai" className="btn-brand mt-3 w-full justify-center sm:mt-0 sm:w-auto">
-              Открыть <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-
           {/* Empty-state hint for fresh pilot users */}
           {!hasAnyData && (
             <div className="mt-6 rounded-2xl border border-panel-border bg-panel p-6">
@@ -451,11 +426,6 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Filler — currency footer */}
-          <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-ink-600">
-            <Boxes className="h-3.5 w-3.5" />
-            Все цены в сомах
-          </p>
         </>
       )}
     </div>
