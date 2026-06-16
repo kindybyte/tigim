@@ -273,6 +273,55 @@ export async function createOrder(companyId: string, input: NewOrderInput): Prom
   return orderRow.number;
 }
 
+// Upsert размера заказа: меняет qty или создаёт новую запись (если в post_cut
+// режиме закройщик добавляет размер, которого не было). qty = 0 удаляет.
+// Используется в post_cut workflow когда закройщик отчитывается по факту.
+export async function upsertOrderSize(
+  orderUuid: string,
+  size: string,
+  qty: number,
+): Promise<void> {
+  const sb = getSupabase();
+  if (qty <= 0) {
+    const { error } = await sb
+      .from("order_sizes")
+      .delete()
+      .eq("order_id", orderUuid)
+      .eq("size", size);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  // Проверяем что строка есть
+  const { data: existing } = await sb
+    .from("order_sizes")
+    .select("id")
+    .eq("order_id", orderUuid)
+    .eq("size", size)
+    .maybeSingle();
+  if (existing) {
+    const { error } = await sb
+      .from("order_sizes")
+      .update({ qty })
+      .eq("id", (existing as { id: string }).id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await sb
+      .from("order_sizes")
+      .insert({ order_id: orderUuid, size, qty });
+    if (error) throw new Error(error.message);
+  }
+  // Пересчитываем orders.qty = сумма order_sizes.qty
+  const { data: all } = await sb
+    .from("order_sizes")
+    .select("qty")
+    .eq("order_id", orderUuid);
+  const total = (all ?? []).reduce(
+    (s, r) => s + (typeof r.qty === "string" ? parseFloat(r.qty) : r.qty || 0),
+    0,
+  );
+  await sb.from("orders").update({ qty: total }).eq("id", orderUuid);
+}
+
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus,

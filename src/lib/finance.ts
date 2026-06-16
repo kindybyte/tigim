@@ -205,6 +205,8 @@ export function emptyCostBreakdown(): OrderCostBreakdown {
     other: 0,
     laborPerPiece: 0,
     laborMonthly: 0,
+    unitRates: { accessories: 0, embroidery: 0, packaging: 0, other: 0 },
+    actualOutput: 0,
     work: 0,
     defects: 0,
     total: 0,
@@ -234,6 +236,8 @@ export async function getOrderCostBreakdown(
     monthLogsRes,
     employeesRes,
     defectsRes,
+    unitRatesRes,
+    sizesRes,
   ] = await Promise.all([
     supabase.from("order_expenses").select("category, amount").eq("order_id", orderUuid),
     supabase
@@ -251,6 +255,11 @@ export async function getOrderCostBreakdown(
       .eq("company_id", companyId)
       .neq("status", "fired"),
     supabase.from("defects").select("loss").eq("order_id", orderUuid),
+    supabase
+      .from("order_unit_rates")
+      .select("category, rate_per_piece")
+      .eq("order_id", orderUuid),
+    supabase.from("order_sizes").select("qty").eq("order_id", orderUuid),
   ]);
 
   if (expensesRes.error) throw new Error(expensesRes.error.message);
@@ -258,6 +267,8 @@ export async function getOrderCostBreakdown(
   if (monthLogsRes.error) throw new Error(monthLogsRes.error.message);
   if (employeesRes.error) throw new Error(employeesRes.error.message);
   if (defectsRes.error) throw new Error(defectsRes.error.message);
+  if (unitRatesRes.error) throw new Error(unitRatesRes.error.message);
+  if (sizesRes.error) throw new Error(sizesRes.error.message);
 
   // Расходы по категориям
   const breakdown = emptyCostBreakdown();
@@ -300,6 +311,23 @@ export async function getOrderCostBreakdown(
     0,
   );
 
+  // Фактический выход — сумма размеров заказа (qty в order_sizes).
+  // Это то «количество которое реально вышло из раскроя».
+  const actualOutput = (sizesRes.data ?? []).reduce(
+    (s, r) => s + (typeof r.qty === "string" ? parseFloat(r.qty) : r.qty || 0),
+    0,
+  );
+  breakdown.actualOutput = actualOutput;
+
+  // Per-unit ставки × выход.
+  const rates = breakdown.unitRates;
+  (unitRatesRes.data ?? []).forEach((r) => {
+    const cat = r.category as keyof typeof rates;
+    if (cat in rates) {
+      rates[cat] = Math.round(num(r.rate_per_piece) * actualOutput);
+    }
+  });
+
   breakdown.laborPerPiece = Math.round(laborPerPiece);
   breakdown.laborMonthly = laborMonthly;
   breakdown.work = breakdown.laborPerPiece + breakdown.laborMonthly;
@@ -310,6 +338,10 @@ export async function getOrderCostBreakdown(
     breakdown.packaging +
     breakdown.overhead +
     breakdown.other +
+    rates.accessories +
+    rates.embroidery +
+    rates.packaging +
+    rates.other +
     breakdown.work +
     breakdown.defects;
 

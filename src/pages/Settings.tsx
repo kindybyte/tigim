@@ -38,7 +38,7 @@ import {
   type CompanyMember,
   type VisibleRole,
 } from "../lib/company";
-import type { WarehouseMode } from "../types";
+import type { CostMode, WarehouseMode } from "../types";
 import {
   inviteUrl,
   listInvitations,
@@ -293,6 +293,7 @@ export default function Settings() {
   const [address, setAddress] = useState("");
   const [usdRate, setUsdRate] = useState("");
   const [warehouseMode, setWarehouseMode] = useState<WarehouseMode>("full");
+  const [costMode, setCostMode] = useState<CostMode>("precise");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -304,6 +305,7 @@ export default function Settings() {
       setAddress(company.address ?? "");
       setUsdRate(String(company.usdRate));
       setWarehouseMode(company.warehouseMode);
+      setCostMode(company.costMode);
     } else if (!isReal) {
       // Демо
       setName(mockCompany.name);
@@ -311,6 +313,7 @@ export default function Settings() {
       setAddress(mockCompany.address);
       setUsdRate("88");
       setWarehouseMode("full");
+      setCostMode("precise");
     }
   }, [company, isReal]);
 
@@ -326,6 +329,7 @@ export default function Settings() {
         address: address.trim() || null,
         usdRate: parseFloat(usdRate) || 88,
         warehouseMode,
+        costMode,
       });
       await refreshCompany();
       setSavedAt(new Date());
@@ -448,6 +452,48 @@ export default function Settings() {
                         <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
                           Все поля: цвет, поставщик, минимальный остаток, USD-цены с конвертацией,
                           алерты низкого остатка, история движений.
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="sm:col-span-2 rounded-xl border border-panel-border bg-panel-muted/40 p-4">
+                    <label className="label">Режим расчёта себестоимости</label>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      Управляет тем, как считается себес заказа: вручную при создании или
+                      автоматически из реальных расходов и выработки.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setCostMode("precise")}
+                        disabled={!isReal}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          costMode === "precise"
+                            ? "border-brand-500/60 bg-brand-500/10 ring-1 ring-brand-500/30"
+                            : "border-panel-border bg-panel hover:border-panel-border/80 hover:bg-panel-muted"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        <p className="text-sm font-semibold text-ink-900">Точный</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
+                          При создании заказа сразу указываешь размеры и себес за единицу.
+                          Подходит для повторяющихся изделий с известной ценой.
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCostMode("post_cut")}
+                        disabled={!isReal}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          costMode === "post_cut"
+                            ? "border-brand-500/60 bg-brand-500/10 ring-1 ring-brand-500/30"
+                            : "border-panel-border bg-panel hover:border-panel-border/80 hover:bg-panel-muted"
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                      >
+                        <p className="text-sm font-semibold text-ink-900">По факту</p>
+                        <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
+                          Создаёшь заказ с оценкой тиража. Закройщик потом вписывает размеры
+                          по факту, ты записываешь расходы и ставки. Себес считается сам.
                         </p>
                       </button>
                     </div>

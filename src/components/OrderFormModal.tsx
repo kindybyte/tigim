@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { createOrder } from "../lib/orders";
 import { listEmployees } from "../lib/employees";
+import { useAuth } from "../lib/auth";
 import type { Employee, Priority } from "../types";
 
 interface OrderFormModalProps {
@@ -17,6 +18,9 @@ interface SizeRow {
 }
 
 export default function OrderFormModal({ open, onClose, onCreated, companyId }: OrderFormModalProps) {
+  const { company } = useAuth();
+  const isPostCut = (company?.costMode ?? "precise") === "post_cut";
+
   const [client, setClient] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [product, setProduct] = useState("");
@@ -29,6 +33,9 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
   const [responsibleId, setResponsibleId] = useState("");
   const [comment, setComment] = useState("");
   const [sizes, setSizes] = useState<SizeRow[]>([{ size: "S", qty: "" }]);
+  // post_cut: общая оценка тиража и галочки размеров без количества.
+  const [estimateQty, setEstimateQty] = useState("");
+  const [postCutSizes, setPostCutSizes] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +69,8 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
       setResponsibleId("");
       setComment("");
       setSizes([{ size: "S", qty: "" }]);
+      setEstimateQty("");
+      setPostCutSizes([]);
       setError(null);
       // Fetch employees for the responsible dropdown
       listEmployees(companyId)
@@ -82,24 +91,51 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
     setSizes((s) => s.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
 
-  const totalQty = sizes.reduce((acc, s) => acc + (parseInt(s.qty) || 0), 0);
+  const totalQty = isPostCut
+    ? parseInt(estimateQty) || 0
+    : sizes.reduce((acc, s) => acc + (parseInt(s.qty) || 0), 0);
   const computedRevenue = (parseFloat(unitPrice) || 0) * totalQty;
-  const computedProfit = computedRevenue - (parseFloat(unitCost) || 0) * totalQty;
+  const computedProfit = isPostCut
+    ? computedRevenue
+    : computedRevenue - (parseFloat(unitCost) || 0) * totalQty;
+
+  function togglePostCutSize(size: string) {
+    setPostCutSizes((s) => (s.includes(size) ? s.filter((x) => x !== size) : [...s, size]));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const cleanSizes = sizes
-      .map((s) => ({ size: s.size.trim(), qty: parseInt(s.qty) || 0 }))
-      .filter((s) => s.size && s.qty > 0);
+    let qty: number;
+    let cleanSizes: { size: string; qty: number }[];
 
-    const qty = cleanSizes.reduce((acc, s) => acc + s.qty, 0);
-    if (qty <= 0) {
-      setError("Укажите размеры и количество (минимум один размер)");
-      setLoading(false);
-      return;
+    if (isPostCut) {
+      qty = parseInt(estimateQty) || 0;
+      if (qty <= 0) {
+        setError("Укажите оценку тиража (примерное количество штук).");
+        setLoading(false);
+        return;
+      }
+      if (postCutSizes.length === 0) {
+        setError("Отметьте хотя бы один размер из тех что будут в раскрое.");
+        setLoading(false);
+        return;
+      }
+      // qty=0 — «заявка», закройщик потом впишет фактический выход через
+      // карточку заказа.
+      cleanSizes = postCutSizes.map((s) => ({ size: s, qty: 0 }));
+    } else {
+      cleanSizes = sizes
+        .map((s) => ({ size: s.size.trim(), qty: parseInt(s.qty) || 0 }))
+        .filter((s) => s.size && s.qty > 0);
+      qty = cleanSizes.reduce((acc, s) => acc + s.qty, 0);
+      if (qty <= 0) {
+        setError("Укажите размеры и количество (минимум один размер)");
+        setLoading(false);
+        return;
+      }
     }
 
     try {
@@ -114,7 +150,9 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
           .filter(Boolean),
         qty,
         unitPrice: parseFloat(unitPrice) || 0,
-        unitCost: parseFloat(unitCost) || 0,
+        // В post_cut режиме себес считается из реальных расходов — поле
+        // unit_cost оставляем нулём.
+        unitCost: isPostCut ? 0 : parseFloat(unitCost) || 0,
         deadline: deadline || undefined,
         priority,
         responsibleId: responsibleId || undefined,
@@ -128,6 +166,9 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
       setLoading(false);
     }
   }
+
+  // Стандартный набор размеров для галочек в post_cut.
+  const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL"];
 
   return (
     <div
@@ -224,7 +265,7 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
               />
             </div>
 
-            <div>
+            <div className={isPostCut ? "sm:col-span-2" : ""}>
               <label htmlFor="of-price" className="label">Цена за единицу (сом)</label>
               <input
                 id="of-price"
@@ -236,20 +277,28 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
                 className="input mt-1.5"
                 placeholder="420"
               />
+              {isPostCut && (
+                <p className="mt-1 text-[11px] text-ink-600">
+                  Себестоимость посчитается автоматически из расходов и ставок на единицу —
+                  заполнишь в карточке заказа после создания.
+                </p>
+              )}
             </div>
-            <div>
-              <label htmlFor="of-cost" className="label">Себестоимость (сом)</label>
-              <input
-                id="of-cost"
-                type="number"
-                step="0.01"
-                min="0"
-                value={unitCost}
-                onChange={(e) => setUnitCost(e.target.value)}
-                className="input mt-1.5"
-                placeholder="280"
-              />
-            </div>
+            {!isPostCut && (
+              <div>
+                <label htmlFor="of-cost" className="label">Себестоимость (сом)</label>
+                <input
+                  id="of-cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={unitCost}
+                  onChange={(e) => setUnitCost(e.target.value)}
+                  className="input mt-1.5"
+                  placeholder="280"
+                />
+              </div>
+            )}
 
             <div>
               <label htmlFor="of-priority" className="label">Приоритет</label>
@@ -294,52 +343,102 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
           </div>
 
           {/* Sizes */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <p className="label">Размеры и количество <span className="text-rose-300">*</span></p>
-              <button
-                type="button"
-                onClick={addSize}
-                className="inline-flex items-center gap-1 rounded-md bg-panel-muted px-2 py-1 text-xs font-semibold text-ink-700 hover:bg-panel-hover"
-              >
-                <Plus className="h-3 w-3" /> Добавить размер
-              </button>
-            </div>
-            <div className="mt-2 space-y-2">
-              {sizes.map((row, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <input
-                    value={row.size}
-                    onChange={(e) => patchSize(idx, { size: e.target.value })}
-                    className="input"
-                    placeholder="Размер (S, M, 30, ...)"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    value={row.qty}
-                    onChange={(e) => patchSize(idx, { qty: e.target.value })}
-                    className="input"
-                    placeholder="Кол-во"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSize(idx)}
-                    disabled={sizes.length === 1}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30 disabled:hover:bg-transparent"
-                    aria-label="Удалить размер"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+          {isPostCut ? (
+            <div className="mt-6 space-y-4">
+              <div>
+                <label htmlFor="of-estimate" className="label">
+                  Оценка тиража <span className="text-rose-300">*</span>{" "}
+                  <span className="text-ink-600">(сколько штук примерно)</span>
+                </label>
+                <input
+                  id="of-estimate"
+                  type="number"
+                  min="1"
+                  value={estimateQty}
+                  onChange={(e) => setEstimateQty(e.target.value)}
+                  className="input mt-1.5"
+                  placeholder="1200"
+                />
+                <p className="mt-1 text-[11px] text-ink-600">
+                  Точные размеры впишет закройщик после раскроя через карточку заказа.
+                </p>
+              </div>
+              <div>
+                <p className="label">
+                  Размеры в работе <span className="text-rose-300">*</span>{" "}
+                  <span className="text-ink-600">(без количества)</span>
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {SIZE_OPTIONS.map((s) => {
+                    const active = postCutSizes.includes(s);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => togglePostCutSize(s)}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+                          active
+                            ? "bg-brand-600 text-white shadow-sm"
+                            : "bg-panel-muted text-ink-700 hover:bg-panel-hover"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-6">
+              <div className="flex items-center justify-between">
+                <p className="label">Размеры и количество <span className="text-rose-300">*</span></p>
+                <button
+                  type="button"
+                  onClick={addSize}
+                  className="inline-flex items-center gap-1 rounded-md bg-panel-muted px-2 py-1 text-xs font-semibold text-ink-700 hover:bg-panel-hover"
+                >
+                  <Plus className="h-3 w-3" /> Добавить размер
+                </button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {sizes.map((row, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      value={row.size}
+                      onChange={(e) => patchSize(idx, { size: e.target.value })}
+                      className="input"
+                      placeholder="Размер (S, M, 30, ...)"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      value={row.qty}
+                      onChange={(e) => patchSize(idx, { qty: e.target.value })}
+                      className="input"
+                      placeholder="Кол-во"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSize(idx)}
+                      disabled={sizes.length === 1}
+                      className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-ink-600 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30 disabled:hover:bg-transparent"
+                      aria-label="Удалить размер"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Summary */}
-          <div className="mt-5 grid grid-cols-3 gap-2 rounded-xl bg-panel-muted px-3 py-3 text-center text-xs">
+          <div className={`mt-5 grid gap-2 rounded-xl bg-panel-muted px-3 py-3 text-center text-xs ${
+            isPostCut ? "grid-cols-2" : "grid-cols-3"
+          }`}>
             <div>
-              <p className="text-ink-600">Всего штук</p>
+              <p className="text-ink-600">{isPostCut ? "Оценка тиража" : "Всего штук"}</p>
               <p className="mt-0.5 text-base font-bold text-ink-900 tabular-nums">{totalQty}</p>
             </div>
             <div>
@@ -348,12 +447,14 @@ export default function OrderFormModal({ open, onClose, onCreated, companyId }: 
                 {computedRevenue.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} сом
               </p>
             </div>
-            <div>
-              <p className="text-ink-600">Прибыль</p>
-              <p className="mt-0.5 text-base font-bold text-emerald-300 tabular-nums">
-                {computedProfit.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} сом
-              </p>
-            </div>
+            {!isPostCut && (
+              <div>
+                <p className="text-ink-600">Прибыль</p>
+                <p className="mt-0.5 text-base font-bold text-emerald-300 tabular-nums">
+                  {computedProfit.toLocaleString("ru-RU", { maximumFractionDigits: 0 })} сом
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (

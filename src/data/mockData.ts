@@ -24,6 +24,8 @@ function mockCost(
     other: 0,
     laborPerPiece: work,
     laborMonthly: 0,
+    unitRates: { accessories: 0, embroidery: 0, packaging: 0, other: 0 },
+    actualOutput: 0,
     work,
     defects,
     total: fabric + accessories + packaging + work + defects,

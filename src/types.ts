@@ -93,6 +93,14 @@ export interface OrderCostBreakdown {
   // Работа
   laborPerPiece: number;   // сдельщики: Σ work_logs.qty × rate_per_piece
   laborMonthly: number;    // доля окладов, разнесённая пропорционально выработке месяца
+  // Per-unit ставки × фактический выход (только post_cut режим)
+  unitRates: {
+    accessories: number;
+    embroidery: number;
+    packaging: number;
+    other: number;
+  };
+  actualOutput: number;    // суммарный фактический выход (sum order_sizes.qty)
   // Аггрегаты для обратной совместимости
   work: number;            // = laborPerPiece + laborMonthly
   defects: number;
@@ -119,6 +127,19 @@ export interface Material {
 
 export type WarehouseMode = "simple" | "full";
 
+// precise = указываешь себестоимость вручную при создании заказа (как раньше).
+// post_cut = себес считается автоматически из расходов + per-unit ставок × выход.
+export type CostMode = "precise" | "post_cut";
+
+export type UnitRateCategory = "accessories" | "embroidery" | "packaging" | "other";
+
+export interface OrderUnitRate {
+  id: string;
+  orderId: string;
+  category: UnitRateCategory;
+  ratePerPiece: number;
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -127,6 +148,7 @@ export interface Company {
   plan: "trial" | "start" | "pro" | "factory";
   usdRate: number;               // курс USD→KGS, дефолт 88
   warehouseMode: WarehouseMode;  // simple = упрощённый UI склада, full = со всеми полями
+  costMode: CostMode;            // precise = ручной unit_cost, post_cut = автосчёт
   trialEndsAt: string | null;
 }
 

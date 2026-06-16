@@ -36,7 +36,7 @@ import {
 import type { Order, OrderExpense, Stage } from "../types";
 import { useAuth } from "../lib/auth";
 import { canSeeFinance } from "../lib/company";
-import { getOrderByNumber, subscribeToOrders } from "../lib/orders";
+import { getOrderByNumber, subscribeToOrders, upsertOrderSize } from "../lib/orders";
 import {
   deleteWorkLog,
   listWorkLogsForOrder,
@@ -49,12 +49,20 @@ import {
   listOrderExpenses,
   subscribeToOrderExpenses,
 } from "../lib/orderExpenses";
+import {
+  listOrderUnitRates,
+  setOrderUnitRate,
+  UNIT_RATE_CATEGORIES,
+  UNIT_RATE_LABELS,
+} from "../lib/orderUnitRates";
+import type { OrderUnitRate, UnitRateCategory } from "../types";
 
 export default function OrderDetails() {
   const { id } = useParams<{ id: string }>();
-  const { configured, companyId, currentRole } = useAuth();
+  const { configured, companyId, currentRole, company } = useAuth();
   const useRealData = configured && !!companyId;
   const showFinance = !useRealData || canSeeFinance(currentRole);
+  const isPostCut = (company?.costMode ?? "precise") === "post_cut";
 
   const [order, setOrder] = useState<Order | null>(
     useRealData ? null : mockOrders.find((o) => o.id === id) ?? mockOrders[0],
@@ -63,6 +71,7 @@ export default function OrderDetails() {
   const [error, setError] = useState<string | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [expenses, setExpenses] = useState<OrderExpense[]>([]);
+  const [unitRates, setUnitRates] = useState<OrderUnitRate[]>([]);
   const [logModalOpen, setLogModalOpen] = useState(false);
   const [logModalStageId, setLogModalStageId] = useState<string | undefined>(undefined);
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
@@ -74,12 +83,14 @@ export default function OrderDetails() {
       setOrder(row);
       setError(null);
       if (row?.uuid) {
-        const [logs, exps] = await Promise.all([
+        const [logs, exps, rates] = await Promise.all([
           listWorkLogsForOrder(row.uuid),
           listOrderExpenses(row.uuid),
+          listOrderUnitRates(row.uuid),
         ]);
         setWorkLogs(logs);
         setExpenses(exps);
+        setUnitRates(rates);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить заказ");
@@ -167,16 +178,42 @@ export default function OrderDetails() {
   const realTotal = cb.total;
   const realProfit = order.revenue - realTotal;
   const realMargin = order.revenue > 0 ? Math.round((realProfit / order.revenue) * 100) : 0;
-  const perUnitCost = order.qty > 0 ? Math.round(realTotal / order.qty) : 0;
+  // В post_cut делим на фактический выход (sum order_sizes.qty). В точном — на order.qty.
+  const divisor = isPostCut ? cb.actualOutput || 0 : order.qty;
+  const perUnitCost = divisor > 0 ? Math.round(realTotal / divisor) : 0;
   const expensesTotal = expenses.reduce((s, e) => s + e.amount, 0);
+
+  async function handleSetRate(category: UnitRateCategory, rate: number) {
+    if (!order?.uuid) return;
+    try {
+      await setOrderUnitRate(order.uuid, category, rate);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось сохранить ставку");
+    }
+  }
+
+  async function handleSetSizeQty(size: string, qty: number) {
+    if (!order?.uuid) return;
+    try {
+      await upsertOrderSize(order.uuid, size, qty);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось обновить размер");
+    }
+  }
 
   // Cтроки таблицы «Из чего себестоимость» — показываем только ненулевые.
   const breakdownLines: { label: string; value: number; color: string; hint?: string }[] = [
     { label: "Ткань", value: cb.fabric, color: "bg-brand-500" },
-    { label: "Фурнитура", value: cb.accessories, color: "bg-violet-500" },
-    { label: "Упаковка", value: cb.packaging, color: "bg-amber-500" },
+    { label: "Фурнитура (расход)", value: cb.accessories, color: "bg-violet-500" },
+    { label: "Упаковка (расход)", value: cb.packaging, color: "bg-amber-500" },
     { label: "Накладные", value: cb.overhead, color: "bg-slate-500" },
-    { label: "Прочее", value: cb.other, color: "bg-stone-500" },
+    { label: "Прочее (расход)", value: cb.other, color: "bg-stone-500" },
+    { label: "Фурнитура × выход", value: cb.unitRates.accessories, color: "bg-violet-400", hint: "по ставке" },
+    { label: "Вышивка × выход", value: cb.unitRates.embroidery, color: "bg-fuchsia-500", hint: "по ставке" },
+    { label: "Упаковка × выход", value: cb.unitRates.packaging, color: "bg-amber-400", hint: "по ставке" },
+    { label: "Прочее × выход", value: cb.unitRates.other, color: "bg-stone-400", hint: "по ставке" },
     { label: "Сдельная работа", value: cb.laborPerPiece, color: "bg-teal-500", hint: "из выработки" },
     { label: "Доля окладов", value: cb.laborMonthly, color: "bg-cyan-500", hint: "пропорц. месяц" },
     { label: "Брак", value: cb.defects, color: "bg-rose-500" },
@@ -343,27 +380,49 @@ export default function OrderDetails() {
           </Card>
 
           {/* Sizes */}
-          <Card title="Размерная сетка" subtitle="План и фактическое выполнение">
+          <Card
+            title="Размерная сетка"
+            subtitle={
+              isPostCut
+                ? "Закройщик вписывает фактический выход по каждому размеру"
+                : "План и фактическое выполнение"
+            }
+          >
             <div className="overflow-hidden rounded-lg border border-panel-border">
               <table className="w-full text-sm">
                 <thead className="bg-panel-muted text-left text-[11px] font-semibold uppercase tracking-wider text-ink-600">
                   <tr>
                     <th className="px-4 py-2.5">Размер</th>
-                    <th className="px-4 py-2.5 text-right">План</th>
+                    <th className="px-4 py-2.5 text-right">
+                      {isPostCut ? "Выход из раскроя" : "План"}
+                    </th>
                     <th className="px-4 py-2.5 text-right">Готово</th>
                     <th className="px-4 py-2.5">Прогресс</th>
                   </tr>
                 </thead>
                 <tbody>
                   {order.sizes.map((s) => {
-                    const pct = Math.round(((s.done ?? 0) / s.qty) * 100);
+                    const pct = s.qty > 0 ? Math.round(((s.done ?? 0) / s.qty) * 100) : 0;
                     return (
                       <tr key={s.size} className="border-t border-panel-border">
                         <td className="px-4 py-2.5 font-semibold text-ink-900">{s.size}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">{s.qty}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">
+                          {isPostCut && canLogWork ? (
+                            <SizeQtyInput
+                              initial={s.qty}
+                              onSave={(v) => void handleSetSizeQty(s.size, v)}
+                            />
+                          ) : (
+                            s.qty
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-right tabular-nums">{s.done ?? 0}</td>
                         <td className="px-4 py-2.5">
-                          <ProgressBar value={pct} showLabel />
+                          {s.qty > 0 ? (
+                            <ProgressBar value={pct} showLabel />
+                          ) : (
+                            <span className="text-xs text-ink-600">ожидаем раскрой</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -460,7 +519,9 @@ export default function OrderDetails() {
               <Row label="Цвета" value={order.colors.join(", ")} />
               <Row label="Количество" value={`${formatNumber(order.qty)} шт`} />
               {showFinance && <Row label="Цена за ед." value={formatSom(order.unitPrice)} />}
-              {showFinance && <Row label="Себестоимость ед." value={formatSom(order.unitCost)} />}
+              {showFinance && !isPostCut && (
+                <Row label="Себестоимость ед." value={formatSom(order.unitCost)} />
+              )}
               <Row label="Приоритет" value={order.priority === "high" ? "Высокий" : order.priority === "normal" ? "Обычный" : "Низкий"} />
             </dl>
             {order.comment && (
@@ -535,6 +596,33 @@ export default function OrderDetails() {
                   ))}
                 </ul>
               )}
+            </Card>
+          )}
+
+          {/* Per-unit rates — только в post_cut и с правами */}
+          {canLogWork && isPostCut && showFinance && (
+            <Card
+              title="Ставки на единицу"
+              subtitle={`Расходы которые умножаются на фактический выход (${cb.actualOutput} шт)`}
+            >
+              <ul className="space-y-2">
+                {UNIT_RATE_CATEGORIES.map((cat) => {
+                  const rate = unitRates.find((r) => r.category === cat);
+                  return (
+                    <UnitRateRow
+                      key={cat}
+                      label={UNIT_RATE_LABELS[cat]}
+                      initial={rate?.ratePerPiece ?? 0}
+                      output={cb.actualOutput}
+                      onSave={(v) => void handleSetRate(cat, v)}
+                    />
+                  );
+                })}
+              </ul>
+              <p className="mt-3 rounded-lg bg-panel-muted/40 px-3 py-2 text-[11px] text-ink-600">
+                Пример: фурнитура 20 сом/шт × 1200 шт = 24 000 сом войдут в себестоимость.
+                Поставь 0 чтобы убрать ставку.
+              </p>
             </Card>
           )}
         </div>
@@ -658,4 +746,77 @@ function relativeDate(iso: string): string {
   if (diffDays === 1) return "вчера";
   if (diffDays < 7) return `${diffDays} дн. назад`;
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" });
+}
+
+// Inline-input для qty размера (post_cut). Сохраняет на blur/Enter.
+function SizeQtyInput({ initial, onSave }: { initial: number; onSave: (v: number) => void }) {
+  const [value, setValue] = useState(initial > 0 ? String(initial) : "");
+  useEffect(() => {
+    setValue(initial > 0 ? String(initial) : "");
+  }, [initial]);
+  function commit() {
+    const v = parseInt(value) || 0;
+    if (v !== initial) onSave(v);
+  }
+  return (
+    <input
+      type="number"
+      min="0"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        }
+      }}
+      className="w-20 rounded-md border border-panel-border bg-panel-muted px-2 py-1 text-right text-sm tabular-nums focus:border-brand-500 focus:outline-none"
+      placeholder="0"
+    />
+  );
+}
+
+// Строка управления per-unit ставкой.
+function UnitRateRow({
+  label,
+  initial,
+  output,
+  onSave,
+}: {
+  label: string;
+  initial: number;
+  output: number;
+  onSave: (v: number) => void;
+}) {
+  const [value, setValue] = useState(initial > 0 ? String(initial) : "");
+  useEffect(() => {
+    setValue(initial > 0 ? String(initial) : "");
+  }, [initial]);
+  function commit() {
+    const v = parseFloat(value) || 0;
+    if (Math.abs(v - initial) > 0.001) onSave(v);
+  }
+  const total = (parseFloat(value) || 0) * output;
+  return (
+    <li className="flex items-center gap-3 rounded-lg bg-panel-muted/40 px-3 py-2">
+      <span className="flex-1 text-sm font-medium text-ink-800">{label}</span>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        className="w-24 rounded-md border border-panel-border bg-panel px-2 py-1 text-right text-sm tabular-nums focus:border-brand-500 focus:outline-none"
+        placeholder="0"
+      />
+      <span className="text-xs text-ink-600">сом / шт</span>
+      <span className="ml-2 w-24 text-right text-xs font-semibold tabular-nums text-ink-700">
+        {total > 0 ? `${Math.round(total).toLocaleString("ru-RU")} сом` : "—"}
+      </span>
+    </li>
+  );
 }
