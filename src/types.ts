@@ -8,13 +8,31 @@ export type OrderStatus =
   | "Отгружено"
   | "Проблема";
 
-export type StageName =
-  | "Раскрой"
-  | "Печать/вышивка"
-  | "Пошив"
-  | "ОТК"
-  | "Упаковка"
-  | "Готово";
+// Имя этапа производства — свободный текст. Список этапов настраивается
+// в Настройки → Этапы производства (таблица company_stages).
+// Раньше тут был literal union из 6 хардкод-этапов — это блокировало
+// конфигурируемость для цехов которые не делают печать или хотят свои этапы.
+export type StageName = string;
+
+// Стандартные этапы по умолчанию — используются при создании компании.
+// Не меняй без правки миграции 0021 (триггер companies_create_default_stages).
+export const DEFAULT_STAGE_NAMES: readonly string[] = [
+  "Раскрой",
+  "Печать/вышивка",
+  "Пошив",
+  "ОТК",
+  "Упаковка",
+  "Готово",
+] as const;
+
+export interface CompanyStage {
+  id: string;
+  companyId: string;
+  name: string;
+  position: number;
+  isTerminal: boolean;
+  isActive: boolean;
+}
 
 export type StageStatus = "Ожидает" | "В работе" | "Завершено" | "Проблема";
 

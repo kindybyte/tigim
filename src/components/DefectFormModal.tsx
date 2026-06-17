@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { createDefect, listOrdersForDefect } from "../lib/defects";
 import { listEmployees } from "../lib/employees";
-import type { DefectReason, Employee, StageName } from "../types";
+import { useCompanyStages } from "../lib/companyStages";
+import type { DefectReason, Employee } from "../types";
 
 interface DefectFormModalProps {
   open: boolean;
@@ -20,15 +21,6 @@ const REASONS: DefectReason[] = [
   "Повреждение ткани",
 ];
 
-const STAGES: StageName[] = [
-  "Раскрой",
-  "Печать/вышивка",
-  "Пошив",
-  "ОТК",
-  "Упаковка",
-  "Готово",
-];
-
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -38,6 +30,7 @@ export default function DefectFormModal({
   onCreated,
   companyId,
 }: DefectFormModalProps) {
+  const { activeStageNames } = useCompanyStages();
   const [orders, setOrders] = useState<{ number: string; product: string; unitCost: number }[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [orderNumber, setOrderNumber] = useState<string>("");
@@ -46,7 +39,7 @@ export default function DefectFormModal({
   const [size, setSize] = useState("");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState<DefectReason>("Неровный шов");
-  const [stage, setStage] = useState<StageName>("Пошив");
+  const [stage, setStage] = useState<string>("Пошив");
   const [loss, setLoss] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -77,7 +70,12 @@ export default function DefectFormModal({
     setSize("");
     setQty("");
     setReason("Неровный шов");
-    setStage("Пошив");
+    // Если у компании есть «Пошив» — используем, иначе первый активный этап.
+    setStage(
+      activeStageNames.includes("Пошив")
+        ? "Пошив"
+        : (activeStageNames[0] ?? "Пошив"),
+    );
     setLoss("");
     setEmployeeId("");
     setPhotoFile(null);
@@ -263,10 +261,10 @@ export default function DefectFormModal({
               <select
                 id="df-stage"
                 value={stage}
-                onChange={(e) => setStage(e.target.value as StageName)}
+                onChange={(e) => setStage(e.target.value)}
                 className="input mt-1.5"
               >
-                {STAGES.map((s) => <option key={s}>{s}</option>)}
+                {activeStageNames.map((s) => <option key={s}>{s}</option>)}
               </select>
             </div>
 

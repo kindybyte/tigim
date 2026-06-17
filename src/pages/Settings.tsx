@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Bell,
   Boxes,
   Briefcase,
@@ -13,6 +15,7 @@ import {
   Loader2,
   MessageCircle,
   Plug,
+  Plus,
   Save,
   Shield,
   ShieldCheck,
@@ -20,6 +23,7 @@ import {
   User,
   UserPlus,
   Users,
+  Workflow,
   Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -47,6 +51,15 @@ import {
   SUBSCRIPTION_STATUS_TONE,
 } from "../lib/billing";
 import {
+  createCompanyStage,
+  deleteCompanyStage,
+  listCompanyStages,
+  renameCompanyStage,
+  setStageActive,
+  swapStagePositions,
+} from "../lib/companyStages";
+import type { CompanyStage } from "../types";
+import {
   inviteUrl,
   listInvitations,
   revokeInvitation,
@@ -56,6 +69,7 @@ import {
 const ALL_TABS = [
   { key: "company", label: "Компания", icon: Building2, ownerOnly: true },
   { key: "subscription", label: "Подписка", icon: CreditCard, ownerOnly: true },
+  { key: "stages", label: "Этапы производства", icon: Workflow, ownerOnly: true },
   { key: "users", label: "Пользователи", icon: Users, ownerOnly: true },
   { key: "roles", label: "Роли", icon: Shield, ownerOnly: true },
   { key: "notifications", label: "Уведомления", icon: Bell, ownerOnly: false },
@@ -539,6 +553,8 @@ export default function Settings() {
 
           {tab === "subscription" && <SubscriptionTab company={company} />}
 
+          {tab === "stages" && <StagesTab companyId={companyId} isReal={isReal} />}
+
           {tab === "users" && (
             <Card
               title="Пользователи"
@@ -979,4 +995,296 @@ function dayWord(n: number): string {
   if (mod10 === 1 && mod100 !== 11) return "день";
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "дня";
   return "дней";
+}
+
+// --- Этапы производства ---
+
+function StagesTab({ companyId, isReal }: { companyId: string | null; isReal: boolean }) {
+  const [stages, setStages] = useState<CompanyStage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+
+  const refetch = useCallback(async () => {
+    if (!isReal || !companyId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setStages(await listCompanyStages(companyId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось загрузить этапы");
+    } finally {
+      setLoading(false);
+    }
+  }, [isReal, companyId]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  async function handleToggle(stage: CompanyStage) {
+    setBusyId(stage.id);
+    try {
+      await setStageActive(stage.id, !stage.isActive);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось обновить");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSaveRename(stageId: string) {
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      setEditingId(null);
+      return;
+    }
+    setBusyId(stageId);
+    try {
+      await renameCompanyStage(stageId, trimmed);
+      setEditingId(null);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось переименовать");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(stage: CompanyStage) {
+    if (
+      !confirm(
+        `Удалить этап «${stage.name}»? Этот этап больше не появится в новых заказах. В уже созданных заказах он останется. Если хочешь только спрятать — лучше выключи переключатель.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(stage.id);
+    try {
+      await deleteCompanyStage(stage.id);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось удалить");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSwap(aId: string, bId: string) {
+    if (!companyId) return;
+    setBusyId(aId);
+    try {
+      await swapStagePositions(companyId, aId, bId);
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось поменять местами");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!companyId) return;
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setBusyId("new");
+    try {
+      await createCompanyStage(companyId, { name: trimmed });
+      setNewName("");
+      await refetch();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Не удалось добавить");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!isReal) {
+    return (
+      <Card
+        title="Этапы производства"
+        subtitle="Доступно после подключения Supabase"
+      >
+        <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
+          Демо-режим: список этапов нельзя редактировать.
+        </p>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      title="Этапы производства"
+      subtitle="Список этапов твоего цеха. Применяется ко всем НОВЫМ заказам. Существующие заказы не меняются."
+    >
+      <div className="mb-4 rounded-xl bg-brand-500/10 px-4 py-3 text-xs text-brand-200 ring-1 ring-brand-500/20">
+        <p>
+          <strong>Как это работает:</strong> когда создаётся новый заказ, система автоматически
+          создаёт для него все активные этапы из этого списка. Если у тебя нет своего печатного
+          оборудования — выключи «Печать/вышивка» переключателем. Если есть свой особенный этап
+          (например «DTG-печать» или «Утюжка») — добавь его внизу.
+        </p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-8 text-sm text-ink-600">
+          <Loader2 className="h-4 w-4 animate-spin" /> Загружаем…
+        </div>
+      ) : error ? (
+        <div className="rounded-xl bg-rose-500/15 px-4 py-3 text-sm text-rose-300 ring-1 ring-rose-500/30">
+          {error}{" "}
+          <button onClick={() => void refetch()} className="font-semibold underline">
+            Повторить
+          </button>
+        </div>
+      ) : (
+        <>
+          <ul className="space-y-2">
+            {stages.map((s, idx) => {
+              const prev = idx > 0 ? stages[idx - 1] : null;
+              const next = idx < stages.length - 1 ? stages[idx + 1] : null;
+              const isEditing = editingId === s.id;
+              const isBusy = busyId === s.id;
+              return (
+                <li
+                  key={s.id}
+                  className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 ${
+                    s.isActive
+                      ? "border-panel-border bg-panel-muted/40"
+                      : "border-panel-border/60 bg-panel-muted/20 opacity-60"
+                  }`}
+                >
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-panel font-bold text-ink-700 tabular-nums">
+                    {idx + 1}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        <input
+                          autoFocus
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void handleSaveRename(s.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          className="input flex-1 py-1.5 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveRename(s.id)}
+                          disabled={isBusy}
+                          className="btn-brand text-xs"
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          className="btn-secondary text-xs"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(s.id);
+                          setEditName(s.name);
+                        }}
+                        className="text-left text-sm font-semibold text-ink-900 hover:text-brand-300"
+                        title="Нажми чтобы переименовать"
+                      >
+                        {s.name}
+                        {s.isTerminal && (
+                          <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+                            финальный
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Reorder */}
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => prev && void handleSwap(s.id, prev.id)}
+                      disabled={!prev || isBusy}
+                      aria-label="Вверх"
+                      className="grid h-7 w-7 place-items-center rounded text-ink-600 hover:bg-panel hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => next && void handleSwap(s.id, next.id)}
+                      disabled={!next || isBusy}
+                      aria-label="Вниз"
+                      className="grid h-7 w-7 place-items-center rounded text-ink-600 hover:bg-panel hover:text-ink-900 disabled:opacity-30 disabled:hover:bg-transparent"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Active toggle */}
+                  <button
+                    type="button"
+                    onClick={() => void handleToggle(s)}
+                    disabled={isBusy}
+                    aria-label={s.isActive ? "Выключить" : "Включить"}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+                      s.isActive ? "bg-brand-600" : "bg-panel-border"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-panel shadow transition ${
+                        s.isActive ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(s)}
+                    disabled={isBusy}
+                    aria-label="Удалить этап"
+                    className="rounded p-1 text-ink-600 hover:bg-rose-500/15 hover:text-rose-300 disabled:opacity-30"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          <form onSubmit={handleAdd} className="mt-4 flex gap-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Новый этап (например «DTG-печать», «Утюжка»)"
+              className="input"
+            />
+            <button
+              type="submit"
+              disabled={!newName.trim() || busyId === "new"}
+              className="btn-brand"
+            >
+              <Plus className="h-4 w-4" /> Добавить
+            </button>
+          </form>
+        </>
+      )}
+    </Card>
+  );
 }

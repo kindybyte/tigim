@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Loader2, X } from "lucide-react";
 import { createEmployee } from "../lib/employees";
+import { useCompanyStages } from "../lib/companyStages";
 import { COMMON_EMPLOYEE_ROLES, type PayType, type StageName } from "../types";
 
 interface EmployeeFormModalProps {
@@ -9,15 +10,6 @@ interface EmployeeFormModalProps {
   onCreated: () => void;
   companyId: string;
 }
-
-const STAGES: StageName[] = [
-  "Раскрой",
-  "Печать/вышивка",
-  "Пошив",
-  "ОТК",
-  "Упаковка",
-  "Готово",
-];
 
 // Подсказка этапа по должности. Управляющие позиции (технолог, мастер,
 // менеджер) не привязаны к этапу — для них null = «не назначен».
@@ -47,6 +39,7 @@ export default function EmployeeFormModal({
   onCreated,
   companyId,
 }: EmployeeFormModalProps) {
+  const { activeStageNames } = useCompanyStages();
   const [name, setName] = useState("");
   const [role, setRole] = useState("Швея");
   // "" = не назначен (валидное значение).
@@ -201,7 +194,7 @@ export default function EmployeeFormModal({
                 className="input mt-1.5"
               >
                 <option value="">— не назначен —</option>
-                {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {activeStageNames.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <p className="mt-1 text-[11px] text-ink-600">
                 Технолог/мастер/менеджер обычно работают над всеми этапами — оставьте «не назначен».
