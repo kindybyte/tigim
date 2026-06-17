@@ -61,12 +61,8 @@ interface CompanySummary {
   employees: number;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export async function POST(req: Request): Promise<Response> {
   try {
-    if (req.method !== "POST") {
-      return json({ error: "Метод не поддерживается." }, 405);
-    }
-
     if (!ANTHROPIC_API_KEY) {
       return json(
         { error: "AI-помощник пока не подключён. Администратор не настроил ANTHROPIC_API_KEY." },
