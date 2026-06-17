@@ -301,7 +301,7 @@ export default function Landing() {
             {[
               {
                 name: "Tigim Start",
-                price: "2 000",
+                price: "1 500",
                 desc: "Для маленьких цехов и старта",
                 features: [
                   "До 5 активных заказов",
@@ -314,7 +314,7 @@ export default function Landing() {
               },
               {
                 name: "Tigim Pro",
-                price: "7 000",
+                price: "5 000",
                 desc: "Для активных цехов",
                 features: [
                   "Неограниченные заказы",
@@ -328,7 +328,7 @@ export default function Landing() {
               },
               {
                 name: "Tigim Factory",
-                price: "от 15 000",
+                price: "от 9 000",
                 desc: "Для крупных производств",
                 features: [
                   "Несколько участков",
