@@ -7,9 +7,11 @@ import {
   Briefcase,
   Building2,
   Check,
+  CreditCard,
   Crown,
   Eye,
   Loader2,
+  MessageCircle,
   Plug,
   Save,
   Shield,
@@ -39,6 +41,11 @@ import {
   type VisibleRole,
 } from "../lib/company";
 import type { CostMode, WarehouseMode } from "../types";
+import { daysUntil, PLAN_LABEL, PLANS } from "../lib/plans";
+import {
+  SUBSCRIPTION_STATUS_LABEL,
+  SUBSCRIPTION_STATUS_TONE,
+} from "../lib/billing";
 import {
   inviteUrl,
   listInvitations,
@@ -48,6 +55,7 @@ import {
 
 const ALL_TABS = [
   { key: "company", label: "Компания", icon: Building2, ownerOnly: true },
+  { key: "subscription", label: "Подписка", icon: CreditCard, ownerOnly: true },
   { key: "users", label: "Пользователи", icon: Users, ownerOnly: true },
   { key: "roles", label: "Роли", icon: Shield, ownerOnly: true },
   { key: "notifications", label: "Уведомления", icon: Bell, ownerOnly: false },
@@ -529,6 +537,8 @@ export default function Settings() {
             </Card>
           )}
 
+          {tab === "subscription" && <SubscriptionTab company={company} />}
+
           {tab === "users" && (
             <Card
               title="Пользователи"
@@ -833,4 +843,140 @@ export default function Settings() {
       )}
     </div>
   );
+}
+
+// --- Подписка ---
+
+const OWNER_WHATSAPP = "996997448778";
+
+function SubscriptionTab({ company }: { company: ReturnType<typeof useAuth>["company"] }) {
+  if (!company) {
+    return (
+      <Card title="Подписка" subtitle="Доступно после подключения Supabase">
+        <p className="rounded-lg bg-amber-500/15 px-3 py-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
+          Демо-режим: подписка не настраивается.
+        </p>
+      </Card>
+    );
+  }
+
+  const target = company.paidUntil ?? company.trialEndsAt;
+  const dleft = daysUntil(target);
+  const statusLabel = SUBSCRIPTION_STATUS_LABEL[company.subscriptionStatus];
+  const statusTone = SUBSCRIPTION_STATUS_TONE[company.subscriptionStatus];
+
+  function payMessage(planName: string): string {
+    return `Здравствуйте! Цех «${company!.name}» хочет оплатить тариф ${planName}. Подскажите как лучше провести оплату.`;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card title="Текущая подписка" subtitle="Тариф, статус и срок действия">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-ink-600">Тариф</p>
+            <p className="mt-1 text-2xl font-bold text-ink-900">
+              {PLAN_LABEL[company.plan]}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-ink-600">Статус</p>
+            <div className="mt-1.5">
+              <Badge tone={statusTone} dot>
+                {statusLabel}
+              </Badge>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-ink-600">
+              {company.subscriptionStatus === "trial" ? "Trial до" : "Оплачено до"}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-ink-900">
+              {target
+                ? new Date(target).toLocaleDateString("ru-RU", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "—"}
+            </p>
+            <p className="text-[11px] text-ink-600">
+              {dleft >= 0 ? `осталось ${dleft} ${dayWord(dleft)}` : `просрочено ${-dleft} ${dayWord(-dleft)}`}
+            </p>
+          </div>
+        </div>
+
+        {company.lastPaidAt && company.lastPaidAmount !== null && (
+          <div className="mt-4 rounded-xl bg-panel-muted/40 px-4 py-3 text-xs text-ink-700">
+            Последний платёж: {company.lastPaidAmount.toLocaleString("ru-RU")} сом,{" "}
+            {new Date(company.lastPaidAt).toLocaleDateString("ru-RU")}
+          </div>
+        )}
+      </Card>
+
+      <Card title="Тарифы" subtitle="Оплата манульно через WhatsApp — после получения средств доступ продлеваем">
+        <ul className="grid gap-3 lg:grid-cols-3">
+          {Object.values(PLANS).map((plan) => {
+            const isCurrent = company.plan === plan.code;
+            return (
+              <li
+                key={plan.code}
+                className={`flex flex-col rounded-xl border p-4 ${
+                  isCurrent
+                    ? "border-brand-500/60 bg-brand-500/10"
+                    : "border-panel-border bg-panel-muted/40"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-ink-900">{plan.name}</p>
+                  {isCurrent && (
+                    <span className="rounded-md bg-brand-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-200">
+                      ваш
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-2xl font-bold text-ink-900 tabular-nums">
+                  {plan.monthlyPrice.toLocaleString("ru-RU")}{" "}
+                  <span className="text-xs font-normal text-ink-600">сом/мес</span>
+                </p>
+                <p className="mt-1 text-xs text-ink-600">{plan.shortDesc}</p>
+                <ul className="mt-3 flex-1 space-y-1 text-xs">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-ink-700">
+                      <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(payMessage(plan.name))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`mt-4 w-full justify-center ${
+                    isCurrent ? "btn-secondary" : "btn-brand"
+                  }`}
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  {isCurrent ? "Продлить через WhatsApp" : "Оплатить через WhatsApp"}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-4 rounded-lg bg-panel-muted/40 px-3 py-2 text-xs text-ink-600">
+          После оплаты владелец Tigim фиксирует платёж в системе — подписка автоматически
+          продлевается на оплаченный срок.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+function dayWord(n: number): string {
+  const abs = Math.abs(n);
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod10 === 1 && mod100 !== 11) return "день";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "дня";
+  return "дней";
 }

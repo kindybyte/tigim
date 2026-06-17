@@ -20,6 +20,7 @@ import { OrderStatusBadge } from "../components/ui/Badge";
 import Avatar from "../components/ui/Avatar";
 import LineChart from "../components/charts/LineChart";
 import BarChart from "../components/charts/BarChart";
+import SubscriptionBanner from "../components/app/SubscriptionBanner";
 import {
   formatDateShort,
   formatNumber,
@@ -117,6 +118,7 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
+      <SubscriptionBanner />
       <PageHeader
         title={greetingText}
         description={

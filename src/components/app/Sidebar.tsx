@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Users,
   Wallet,
+  CreditCard,
   FileBarChart,
   Settings,
   ShieldCheck,
@@ -141,6 +142,27 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                       strokeWidth={2}
                     />
                     <span className="flex-1">Заявки</span>
+                  </>
+                )}
+              </NavLink>
+              <NavLink
+                to="/app/admin/customers"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    isActive
+                      ? "bg-brand-500/15 text-brand-300"
+                      : "text-ink-700 hover:bg-panel-muted hover:text-ink-900"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <CreditCard
+                      className={`h-[18px] w-[18px] ${isActive ? "text-brand-300" : "text-ink-600 group-hover:text-ink-700"}`}
+                      strokeWidth={2}
+                    />
+                    <span className="flex-1">Клиенты</span>
                   </>
                 )}
               </NavLink>

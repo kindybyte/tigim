@@ -140,16 +140,38 @@ export interface OrderUnitRate {
   ratePerPiece: number;
 }
 
+export type SubscriptionStatus = "trial" | "active" | "past_due" | "cancelled" | "expired";
+
+export type PaidPlan = "start" | "pro" | "factory";
+export type Plan = "trial" | PaidPlan;
+
 export interface Company {
   id: string;
   name: string;
   phone: string | null;
   address: string | null;
-  plan: "trial" | "start" | "pro" | "factory";
+  plan: Plan;
   usdRate: number;               // курс USD→KGS, дефолт 88
   warehouseMode: WarehouseMode;  // simple = упрощённый UI склада, full = со всеми полями
   costMode: CostMode;            // precise = ручной unit_cost, post_cut = автосчёт
   trialEndsAt: string | null;
+  paidUntil: string | null;      // ISO date — до какой даты оплачено (включительно)
+  lastPaidAt: string | null;
+  lastPaidAmount: number | null;
+  subscriptionStatus: SubscriptionStatus;
+}
+
+export interface Payment {
+  id: string;
+  companyId: string;
+  amount: number;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+  plan: PaidPlan;
+  method: "manual" | "whatsapp" | "bank" | "cash" | "freedompay" | "stripe";
+  notes: string | null;
+  createdAt: string;
 }
 
 export interface Defect {

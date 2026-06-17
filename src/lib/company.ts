@@ -11,6 +11,10 @@ interface CompanyRow {
   warehouse_mode: WarehouseMode | null;
   cost_mode: CostMode | null;
   trial_ends_at: string | null;
+  paid_until: string | null;
+  last_paid_at: string | null;
+  last_paid_amount: number | string | null;
+  subscription_status: Company["subscriptionStatus"] | null;
 }
 
 function num(n: number | string | null | undefined): number {
@@ -29,13 +33,22 @@ function mapRow(row: CompanyRow): Company {
     warehouseMode: row.warehouse_mode ?? "full",
     costMode: row.cost_mode ?? "precise",
     trialEndsAt: row.trial_ends_at,
+    paidUntil: row.paid_until,
+    lastPaidAt: row.last_paid_at,
+    lastPaidAmount:
+      row.last_paid_amount === null || row.last_paid_amount === undefined
+        ? null
+        : num(row.last_paid_amount),
+    subscriptionStatus: row.subscription_status ?? "trial",
   };
 }
 
 export async function getCompany(companyId: string): Promise<Company | null> {
   const { data, error } = await getSupabase()
     .from("companies")
-    .select("id, name, phone, address, plan, usd_rate, warehouse_mode, cost_mode, trial_ends_at")
+    .select(
+      "id, name, phone, address, plan, usd_rate, warehouse_mode, cost_mode, trial_ends_at, paid_until, last_paid_at, last_paid_amount, subscription_status",
+    )
     .eq("id", companyId)
     .maybeSingle();
   if (error) throw new Error(error.message);

@@ -64,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           warehouse_mode: Company["warehouseMode"] | null;
           cost_mode: Company["costMode"] | null;
           trial_ends_at: string | null;
+          paid_until: string | null;
+          last_paid_at: string | null;
+          last_paid_amount: number | string | null;
+          subscription_status: Company["subscriptionStatus"] | null;
         } | null;
       };
       const queryPromise: Promise<{
@@ -73,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getSupabase()
           .from("company_members")
           .select(
-            "company_id, role, companies(id, name, phone, address, plan, usd_rate, warehouse_mode, cost_mode, trial_ends_at)",
+            "company_id, role, companies(id, name, phone, address, plan, usd_rate, warehouse_mode, cost_mode, trial_ends_at, paid_until, last_paid_at, last_paid_amount, subscription_status)",
           )
           .eq("user_id", uid)
           .limit(1)
@@ -118,6 +122,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 warehouseMode: c.warehouse_mode ?? "full",
                 costMode: c.cost_mode ?? "precise",
                 trialEndsAt: c.trial_ends_at,
+                paidUntil: c.paid_until,
+                lastPaidAt: c.last_paid_at,
+                lastPaidAmount:
+                  c.last_paid_amount === null || c.last_paid_amount === undefined
+                    ? null
+                    : typeof c.last_paid_amount === "string"
+                      ? parseFloat(c.last_paid_amount)
+                      : c.last_paid_amount,
+                subscriptionStatus: c.subscription_status ?? "trial",
               }
             : null,
         );
