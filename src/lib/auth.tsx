@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { getSupabase, supabaseConfigured } from "./supabase";
+import { setSentryUser } from "./sentry";
 import type { Company } from "../types";
 
 type CompanyRoleDb = "owner" | "manager" | "warehouse" | "qc" | "staff" | "master" | "technologist";
@@ -164,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const uid = newSession?.user?.id ?? null;
       if (uid === lastUserId) return;
       lastUserId = uid;
+      setSentryUser(uid);
       if (uid) {
         // Optimistically show spinner; defer fetch out of the auth-lock.
         setCompanyLoading(true);

@@ -18,6 +18,7 @@ export default defineConfig({
           "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-icons": ["lucide-react"],
           "vendor-dnd": ["@dnd-kit/core"],
+          "vendor-sentry": ["@sentry/react"],
         },
       },
     },
