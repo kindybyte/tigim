@@ -9,6 +9,7 @@ import {
   Wallet,
   FileBarChart,
   Settings,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -44,7 +45,7 @@ const ALL_NAV: NavItem[] = [
 ];
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
-  const { currentRole, configured } = useAuth();
+  const { currentRole, configured, isPlatformAdmin } = useAuth();
   // В демо-режиме (без Supabase) пунктов меню не урезаем — пусть владелец
   // увидит всё на пустой компании.
   const nav = ALL_NAV.filter((item) => !item.visibleFor || !configured || item.visibleFor(currentRole));
@@ -116,6 +117,35 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               )}
             </NavLink>
           ))}
+
+          {isPlatformAdmin && (
+            <>
+              <p className="px-3 pb-2 pt-5 text-[11px] font-semibold uppercase tracking-wider text-ink-600">
+                Платформа
+              </p>
+              <NavLink
+                to="/app/admin/leads"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+                    isActive
+                      ? "bg-brand-500/15 text-brand-300"
+                      : "text-ink-700 hover:bg-panel-muted hover:text-ink-900"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <ShieldCheck
+                      className={`h-[18px] w-[18px] ${isActive ? "text-brand-300" : "text-ink-600 group-hover:text-ink-700"}`}
+                      strokeWidth={2}
+                    />
+                    <span className="flex-1">Заявки</span>
+                  </>
+                )}
+              </NavLink>
+            </>
+          )}
         </nav>
 
       </aside>

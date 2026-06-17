@@ -28,6 +28,7 @@ const Finance = lazy(() => import("./pages/Finance"));
 // const AIAssistant = lazy(() => import("./pages/AIAssistant"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
+const AdminLeads = lazy(() => import("./pages/AdminLeads"));
 
 function RouteFallback() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
             <Route path="finance" element={<Finance />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="admin/leads" element={<AdminLeads />} />
           </Route>
         </Route>
       </Routes>

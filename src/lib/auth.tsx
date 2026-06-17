@@ -14,6 +14,8 @@ interface AuthContextValue {
   company: Company | null;
   /** Роль текущего пользователя в текущей компании. null если данных нет. */
   currentRole: CompanyRoleDb | null;
+  /** Платформенный админ (видит /app/admin/leads). Только владелец Tigim. */
+  isPlatformAdmin: boolean;
   companyLoading: boolean;
   refreshCompany: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
@@ -36,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [currentRole, setCurrentRole] = useState<CompanyRoleDb | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [companyLoading, setCompanyLoading] = useState(false);
 
   const fetchCompany = useCallback(async (uid: string | undefined) => {
@@ -79,7 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error: { message: string } | null;
         }>,
       );
+      // Параллельно проверяем платформенный admin статус. RPC безопасен —
+      // не падает при ошибке, просто возвращает false.
+      const adminPromise: Promise<boolean> = Promise.resolve(
+        getSupabase().rpc("is_platform_admin"),
+      )
+        .then((r) => r.data === true)
+        .catch(() => false);
+
       const result = await withTimeout(queryPromise, 10000);
+      // Не блокируем основную загрузку на admin RPC — это просто флаг для меню.
+      void adminPromise.then(setIsPlatformAdmin);
+
       if (result.error) {
         console.warn("[auth] fetch company failed:", result.error.message);
         setCompanyId(null);
@@ -147,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCompanyId(null);
         setCompany(null);
         setCurrentRole(null);
+        setIsPlatformAdmin(false);
         setCompanyLoading(false);
       }
     };
@@ -215,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCompanyId(null);
     setCompany(null);
     setCurrentRole(null);
+    setIsPlatformAdmin(false);
   };
 
   const resetPassword: AuthContextValue["resetPassword"] = async (email) => {
@@ -241,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companyId,
         company,
         currentRole,
+        isPlatformAdmin,
         companyLoading,
         refreshCompany,
         signIn,
